@@ -1,14 +1,16 @@
-# Welcome to your Lovable project
+# TaskMaster Quest
+
+Olá! Quero criar um projeto pessoal, um site que me ajude a gerir a minha tarefa e que possa me ajudar a manter controle de tudo que eu tenho que fazer e também q crie algo gamificado para me engajar a fazer coisas que eu não gosto. Quero te conectar ao github, mas primeiro preciso criar um novo repositório.
 
 This project was built with [Lovable](https://lovable.dev).
 
 ## Build with Lovable
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
+Continue developing this project in the [Lovable editor](https://lovable.dev/projects/62bb735a-d1b6-406b-a7dd-363fdb59c5b8).
 
 - **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
+- **Stay in sync**: every change made in Lovable is committed straight to this repository.
+- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
 
 ## Development
 
@@ -20,10 +22,3 @@ cd <repository-name>
 npm i
 npm run dev
 ```
-
-## Built with
-
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
