@@ -5,6 +5,7 @@ import {
   CircleCheck,
   Clock3,
   Edit3,
+  Flame,
   FolderPlus,
   House,
   ListTodo,
@@ -21,6 +22,7 @@ import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 
 
 import { AuthScreen } from "@/components/AuthScreen";
 import { CalendarView } from "@/components/CalendarView";
+import { HabitsDashboard } from "@/components/HabitsDashboard";
 import { HomeDashboard } from "@/components/HomeDashboard";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -128,7 +130,7 @@ function TaskMasterPage() {
 }
 
 function TaskMaster({ userId }: { userId: string }) {
-  const [tab, setTab] = useState<"home" | "calendar" | "new" | "tasks">("home");
+  const [tab, setTab] = useState<"home" | "calendar" | "habits" | "new" | "tasks">("home");
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [tags, setTags] = useState<TagRow[]>([]);
@@ -358,6 +360,7 @@ function TaskMaster({ userId }: { userId: string }) {
         <div className="mb-7 flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm sm:w-fit">
           <button onClick={() => setTab("home")} className={`flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${tab === "home" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><House className="size-4" /> Hoje</button>
           <button onClick={() => setTab("calendar")} className={`flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${tab === "calendar" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><CalendarDays className="size-4" /> Calendário</button>
+          <button onClick={() => setTab("habits")} className={`flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${tab === "habits" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><Flame className="size-4" /> Hábitos</button>
           <button onClick={openNewTask} className={`flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${tab === "new" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><Plus className="size-4" /> Nova missão</button>
           <button onClick={() => setTab("tasks")} className={`flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${tab === "tasks" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><ListTodo className="size-4" /> Minhas tarefas</button>
         </div>
@@ -381,6 +384,8 @@ function TaskMaster({ userId }: { userId: string }) {
             onEditTask={editTask}
             onCompleteTask={(task) => void run(() => completeTaskDb(task.id), "Missão concluída!")}
           />
+        ) : tab === "habits" ? (
+          <HabitsDashboard userId={userId} />
         ) : tab === "new" ? (
           <form onSubmit={saveTask} className="grid gap-6 lg:grid-cols-[1fr_320px]">
             <section className="space-y-6">
