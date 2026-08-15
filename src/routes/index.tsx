@@ -6,6 +6,7 @@ import {
   Clock3,
   Edit3,
   FolderPlus,
+  House,
   ListTodo,
   LogOut,
   Plus,
@@ -19,6 +20,7 @@ import {
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 
 import { AuthScreen } from "@/components/AuthScreen";
+import { HomeDashboard } from "@/components/HomeDashboard";
 import { supabase } from "@/integrations/supabase/client";
 import {
   calcXp,
@@ -125,7 +127,7 @@ function TaskMasterPage() {
 }
 
 function TaskMaster({ userId }: { userId: string }) {
-  const [tab, setTab] = useState<"new" | "tasks">("new");
+  const [tab, setTab] = useState<"home" | "new" | "tasks">("home");
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [tags, setTags] = useState<TagRow[]>([]);
@@ -206,6 +208,14 @@ function TaskMaster({ userId }: { userId: string }) {
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function openNewTask() {
+    setEditingId(null);
+    setForm(emptyForm);
+    setSubtaskDraft("");
+    setTab("new");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function run(action: () => Promise<void>, okText: string) {
@@ -344,12 +354,23 @@ function TaskMaster({ userId }: { userId: string }) {
         {loadError && <div className="mb-5 rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">{loadError}</div>}
         {feedback && <div className={`mb-5 rounded-2xl px-4 py-3 text-sm font-semibold ${feedback.kind === "ok" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>{feedback.text}</div>}
 
-        <div className="mb-7 flex gap-2 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm sm:w-fit">
-          <button onClick={() => { setEditingId(null); setForm(emptyForm); setTab("new"); }} className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition sm:flex-none ${tab === "new" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><Plus className="size-4" /> Nova missão</button>
-          <button onClick={() => setTab("tasks")} className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition sm:flex-none ${tab === "tasks" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><ListTodo className="size-4" /> Minhas tarefas</button>
+        <div className="mb-7 flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm sm:w-fit">
+          <button onClick={() => setTab("home")} className={`flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${tab === "home" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><House className="size-4" /> Hoje</button>
+          <button onClick={openNewTask} className={`flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${tab === "new" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><Plus className="size-4" /> Nova missão</button>
+          <button onClick={() => setTab("tasks")} className={`flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${tab === "tasks" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><ListTodo className="size-4" /> Minhas tarefas</button>
         </div>
 
-        {tab === "new" ? (
+        {tab === "home" ? (
+          <HomeDashboard
+            tasks={tasks}
+            projects={projects}
+            loading={loading}
+            onNewTask={openNewTask}
+            onOpenTasks={() => setTab("tasks")}
+            onEditTask={editTask}
+            onCompleteTask={(task) => void run(() => completeTaskDb(task.id), "Missão concluída!")}
+          />
+        ) : tab === "new" ? (
           <form onSubmit={saveTask} className="grid gap-6 lg:grid-cols-[1fr_320px]">
             <section className="space-y-6">
               <Card>
@@ -399,7 +420,7 @@ function TaskMaster({ userId }: { userId: string }) {
           </form>
         ) : (
           <section className="space-y-5">
-            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="text-sm font-bold text-violet-600">MINHAS TAREFAS</p><h2 className="text-3xl font-bold tracking-tight">Tudo que está no seu radar</h2><p className="mt-1 text-sm text-slate-500">Edite, conclua e organize suas missões sem sair daqui.</p></div><button onClick={() => { setEditingId(null); setForm(emptyForm); setTab("new"); }} className="flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white"><Plus className="size-4" /> Nova tarefa</button></div>
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="text-sm font-bold text-violet-600">MINHAS TAREFAS</p><h2 className="text-3xl font-bold tracking-tight">Tudo que está no seu radar</h2><p className="mt-1 text-sm text-slate-500">Edite, conclua e organize suas missões sem sair daqui.</p></div><button onClick={openNewTask} className="flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white"><Plus className="size-4" /> Nova tarefa</button></div>
 
             <Card>
               <div className="grid gap-3 lg:grid-cols-[1fr_170px_170px_170px]">
