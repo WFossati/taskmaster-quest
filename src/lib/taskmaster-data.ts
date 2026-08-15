@@ -38,9 +38,9 @@ export function calcXp(difficulty: string, priority: string) {
   return Math.round((base[difficulty] ?? 50) * (multiplier[priority] ?? 1));
 }
 
-function unwrap<T>({ data, error }: { data: T | null; error: { message: string } | null }): T {
+function unwrap<T>({ data, error }: { data: T; error: { message: string } | null }): NonNullable<T> {
   if (error) throw new Error(error.message);
-  return data as T;
+  return data as NonNullable<T>;
 }
 
 export async function fetchProjects(): Promise<Project[]> {
