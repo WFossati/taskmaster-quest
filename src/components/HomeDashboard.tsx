@@ -8,13 +8,20 @@ import {
   Flame,
   Gauge,
   Plus,
+  Repeat2,
   Sparkles,
   Target,
   TimerReset,
   Trophy,
   Zap,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
+import {
+  fetchHabits,
+  toggleHabitCompletion,
+  type Habit,
+} from "@/lib/habits-data";
 import { calcXp, type Project, type Task } from "@/lib/taskmaster-data";
 
 type LifeArea = {
@@ -35,25 +42,20 @@ const AREAS: LifeArea[] = [
   { id: "financeiro", name: "Financeiro", dot: "bg-purple-500", soft: "bg-purple-50", text: "text-purple-700", bar: "bg-purple-500" },
 ];
 
-const priorityWeight: Record<string, number> = {
-  Baixa: 1,
-  Média: 2,
-  Alta: 4,
-  Urgente: 7,
-};
-
-const difficultyWeight: Record<string, number> = {
-  "Muito fácil": 0,
-  Fácil: 1,
-  Média: 2,
-  Difícil: 3,
-  Boss: 5,
-};
+const priorityWeight: Record<string, number> = { Baixa: 1, Média: 2, Alta: 4, Urgente: 7 };
+const difficultyWeight: Record<string, number> = { "Muito fácil": 0, Fácil: 1, Média: 2, Difícil: 3, Boss: 5 };
 
 function dateOnly(date: Date) {
   const copy = new Date(date);
   copy.setHours(0, 0, 0, 0);
   return copy;
+}
+
+function localIso(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function parseDue(value: string) {
@@ -88,40 +90,72 @@ function greeting(now: Date) {
 }
 
 function formatLongDate(now: Date) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  }).format(now);
+  return new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "numeric", month: "long" }).format(now);
 }
 
 function startOfWeek(date: Date) {
   const copy = dateOnly(date);
   const day = copy.getDay();
-  const distance = day === 0 ? 6 : day - 1;
-  copy.setDate(copy.getDate() - distance);
+  copy.setDate(copy.getDate() - (day === 0 ? 6 : day - 1));
   return copy;
 }
 
+function habitIsDueToday(habit: Habit, today: Date) {
+  if (!habit.isActive) return false;
+  if (habit.frequency === "daily") return true;
+  if (habit.frequency === "custom") return habit.weekdays.includes(today.getDay());
+
+  const weekStart = startOfWeek(today);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  const completionsThisWeek = habit.completions.filter((completion) => {
+    const date = new Date(`${completion.completedOn}T00:00:00`);
+    return date >= weekStart && date < weekEnd;
+  }).length;
+  return completionsThisWeek < habit.targetPerWeek;
+}
+
 export function HomeDashboard({
+  userId,
   tasks,
   projects,
   loading,
   onNewTask,
   onOpenTasks,
+  onOpenHabits,
   onEditTask,
   onCompleteTask,
 }: {
+  userId: string;
   tasks: Task[];
   projects: Project[];
   loading: boolean;
   onNewTask: () => void;
   onOpenTasks: () => void;
+  onOpenHabits: () => void;
   onEditTask: (task: Task) => void;
   onCompleteTask: (task: Task) => void;
 }) {
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [habitsLoading, setHabitsLoading] = useState(true);
+  const [habitSavingId, setHabitSavingId] = useState<string | null>(null);
+
+  async function reloadHabits() {
+    setHabitsLoading(true);
+    try {
+      setHabits(await fetchHabits());
+    } finally {
+      setHabitsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void reloadHabits();
+  }, [userId]);
+
   const now = new Date();
   const today = dateOnly(now);
+  const todayKey = localIso(today);
   const weekStart = startOfWeek(now);
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 6);
@@ -151,11 +185,22 @@ export function HomeDashboard({
     if (task.status !== "Concluída" || !task.completedAt) return false;
     return isSameDay(new Date(task.completedAt), today);
   });
-  const xpToday = completedToday.reduce((sum, task) => sum + taskXp(task), 0);
-  const availableXpToday = todayTasks.reduce((sum, task) => sum + taskXp(task), 0);
+
+  const habitsToday = useMemo(
+    () => habits.filter((habit) => habitIsDueToday(habit, today)),
+    [habits, todayKey],
+  );
+  const completedHabitsToday = habitsToday.filter((habit) => habit.completions.some((c) => c.completedOn === todayKey));
+  const pendingHabitsToday = habitsToday.filter((habit) => !habit.completions.some((c) => c.completedOn === todayKey));
+
+  const taskXpToday = completedToday.reduce((sum, task) => sum + taskXp(task), 0);
+  const habitXpToday = completedHabitsToday.reduce((sum, habit) => sum + habit.xpReward, 0);
+  const xpToday = taskXpToday + habitXpToday;
+  const availableXpToday = todayTasks.reduce((sum, task) => sum + taskXp(task), 0) + pendingHabitsToday.reduce((sum, habit) => sum + habit.xpReward, 0);
   const minutesToday = todayTasks.reduce((sum, task) => sum + Number(task.duration || 0), 0);
-  const totalDayTasks = todayTasks.length + completedToday.length;
-  const progress = totalDayTasks === 0 ? 0 : Math.round((completedToday.length / totalDayTasks) * 100);
+  const totalDayItems = todayTasks.length + completedToday.length + habitsToday.length;
+  const completedDayItems = completedToday.length + completedHabitsToday.length;
+  const progress = totalDayItems === 0 ? 0 : Math.round((completedDayItems / totalDayItems) * 100);
 
   const weeklyTasks = tasks.filter((task) => {
     const date = task.completedAt ? new Date(task.completedAt) : parseDue(task.dueDate);
@@ -163,11 +208,24 @@ export function HomeDashboard({
   });
   const areaCounts = AREAS.map((area) => ({
     ...area,
-    count: weeklyTasks.filter((task) => task.area === area.id).length,
+    count: weeklyTasks.filter((task) => task.area === area.id).length + habits.filter((habit) => habit.area === area.id && habit.completions.some((c) => {
+      const d = new Date(`${c.completedOn}T00:00:00`);
+      return d >= weekStart && d <= weekEnd;
+    })).length,
   }));
   const weeklyTotal = Math.max(areaCounts.reduce((sum, area) => sum + area.count, 0), 1);
 
-  if (loading) {
+  async function toggleHabit(habit: Habit) {
+    setHabitSavingId(habit.id);
+    try {
+      await toggleHabitCompletion(userId, habit, todayKey);
+      await reloadHabits();
+    } finally {
+      setHabitSavingId(null);
+    }
+  }
+
+  if (loading || habitsLoading) {
     return (
       <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center text-sm font-semibold text-slate-500 shadow-sm">
         Preparando seu painel de hoje...
@@ -183,16 +241,21 @@ export function HomeDashboard({
           <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{greeting(now)} 👋</h2>
           <p className="mt-2 capitalize text-slate-500">{formatLongDate(now)}</p>
         </div>
-        <button onClick={onNewTask} className="flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3.5 text-sm font-bold text-white shadow-sm hover:bg-slate-800">
-          <Plus className="size-4" /> Nova missão
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={onOpenHabits} className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50">
+            <Repeat2 className="size-4" /> Criar hábito
+          </button>
+          <button onClick={onNewTask} className="flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3.5 text-sm font-bold text-white shadow-sm hover:bg-slate-800">
+            <Plus className="size-4" /> Nova missão
+          </button>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={<CalendarDays className="size-5" />} label="Tarefas hoje" value={String(todayTasks.length)} helper={`${completedToday.length} concluídas hoje`} />
+        <MetricCard icon={<CalendarDays className="size-5" />} label="Missões hoje" value={String(todayTasks.length + habitsToday.length)} helper={`${completedDayItems} concluídas hoje`} />
         <MetricCard icon={<AlertTriangle className="size-5" />} label="Atrasadas" value={String(overdueTasks.length)} helper={overdueTasks.length ? "Precisam de atenção" : "Tudo em dia ✨"} tone={overdueTasks.length ? "danger" : "neutral"} />
         <MetricCard icon={<Zap className="size-5" />} label="XP disponível" value={`${availableXpToday} XP`} helper={`+${xpToday} XP conquistados hoje`} />
-        <MetricCard icon={<Clock3 className="size-5" />} label="Tempo planejado" value={formatMinutes(minutesToday)} helper="Para as missões de hoje" />
+        <MetricCard icon={<Repeat2 className="size-5" />} label="Hábitos hoje" value={`${completedHabitsToday.length}/${habitsToday.length}`} helper={habitsToday.length ? "Check-ins do dia" : "Nenhum hábito programado"} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.45fr_0.75fr]">
@@ -229,7 +292,7 @@ export function HomeDashboard({
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-2 text-sm font-bold"><Gauge className="size-5 text-violet-600" /> Progresso de hoje</div>
           <div className="mt-6 flex items-end justify-between gap-4">
-            <div><p className="text-4xl font-bold tracking-tight">{progress}%</p><p className="mt-1 text-sm text-slate-500">{completedToday.length} de {totalDayTasks} missões concluídas</p></div>
+            <div><p className="text-4xl font-bold tracking-tight">{progress}%</p><p className="mt-1 text-sm text-slate-500">{completedDayItems} de {totalDayItems} missões concluídas</p></div>
             <div className="rounded-2xl bg-violet-50 px-3 py-2 text-sm font-bold text-violet-700">+{xpToday} XP</div>
           </div>
           <div className="mt-5 h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-slate-950 transition-all" style={{ width: `${progress}%` }} /></div>
@@ -239,7 +302,49 @@ export function HomeDashboard({
 
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-          <div><p className="text-sm font-bold text-slate-900">Seu foco de hoje</p><p className="mt-1 text-sm text-slate-500">As 3 missões que mais merecem sua atenção agora.</p></div>
+          <div><p className="text-sm font-bold text-slate-900">Hábitos de hoje</p><p className="mt-1 text-sm text-slate-500">Aparecem como missões diárias. Marque quando concluir.</p></div>
+          <button onClick={onOpenHabits} className="text-sm font-bold text-violet-600">Gerenciar hábitos</button>
+        </div>
+        <div className="mt-5 space-y-3">
+          {habitsToday.length ? habitsToday.map((habit) => {
+            const completed = habit.completions.some((c) => c.completedOn === todayKey);
+            const area = AREAS.find((a) => a.id === habit.area) ?? AREAS[0]!;
+            return (
+              <div key={habit.id} className={`flex items-center gap-4 rounded-2xl border px-4 py-3.5 transition ${completed ? "border-emerald-200 bg-emerald-50/50" : "border-slate-200 bg-white"}`}>
+                <button
+                  onClick={() => void toggleHabit(habit)}
+                  disabled={habitSavingId === habit.id}
+                  className={`grid size-8 shrink-0 place-items-center rounded-full border-2 transition disabled:opacity-50 ${completed ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300 text-transparent hover:border-emerald-500 hover:text-emerald-500"}`}
+                  title={completed ? "Desmarcar hábito" : "Concluir hábito"}
+                >
+                  <Check className="size-4" />
+                </button>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className={`font-bold ${completed ? "text-slate-400 line-through" : "text-slate-900"}`}>{habit.name}</p>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${area.soft} ${area.text}`}>{area.name}</span>
+                    <span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700">Hábito</span>
+                  </div>
+                  {habit.description && <p className="mt-1 line-clamp-1 text-sm text-slate-500">{habit.description}</p>}
+                  <p className="mt-2 text-xs font-semibold text-slate-500">{habit.frequency === "daily" ? "Todos os dias" : habit.frequency === "weekly" ? `${habit.targetPerWeek}x por semana` : "Dias específicos"}</p>
+                </div>
+                <span className={`shrink-0 text-sm font-bold ${completed ? "text-emerald-600" : "text-violet-600"}`}>{completed ? `+${habit.xpReward} XP ✓` : `+${habit.xpReward} XP`}</span>
+              </div>
+            );
+          }) : (
+            <div className="rounded-2xl bg-slate-50 px-5 py-8 text-center">
+              <Repeat2 className="mx-auto mb-3 size-7 text-slate-300" />
+              <p className="font-bold text-slate-700">Nenhum hábito para hoje</p>
+              <p className="mt-1 text-sm text-slate-500">Crie um hábito e ele aparecerá aqui automaticamente nos dias programados.</p>
+              <button onClick={onOpenHabits} className="mt-4 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white">Criar meu primeiro hábito</button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+          <div><p className="text-sm font-bold text-slate-900">Seu foco de hoje</p><p className="mt-1 text-sm text-slate-500">As 3 tarefas que mais merecem sua atenção agora.</p></div>
           <button onClick={onOpenTasks} className="text-sm font-bold text-violet-600">Ver todas as tarefas</button>
         </div>
         <div className="mt-5 space-y-3">
@@ -249,7 +354,7 @@ export function HomeDashboard({
               <div className="min-w-0 flex-1"><p className="truncate font-bold text-slate-900">{task.title}</p><p className="mt-1 text-xs font-semibold text-slate-500">{areaName(task.area)} · {task.priority}{task.dueDate ? ` · ${dueLabel(task.dueDate, today)}` : ""}</p></div>
               <span className="shrink-0 text-sm font-bold text-violet-600">+{taskXp(task)} XP</span>
             </button>
-          )) : <p className="rounded-2xl bg-slate-50 px-4 py-5 text-sm font-semibold text-slate-500">Nenhuma missão em aberto.</p>}
+          )) : <p className="rounded-2xl bg-slate-50 px-4 py-5 text-sm font-semibold text-slate-500">Nenhuma tarefa em aberto.</p>}
         </div>
       </div>
 
@@ -263,7 +368,7 @@ export function HomeDashboard({
         </DashboardCard>
       </div>
 
-      <DashboardCard title="Seu foco esta semana" icon={<Flame className="size-5 text-violet-600" />} helper="Distribuição das missões por área da vida">
+      <DashboardCard title="Seu foco esta semana" icon={<Flame className="size-5 text-violet-600" />} helper="Distribuição das missões e hábitos por área da vida">
         <div className="space-y-4">
           {areaCounts.map((area) => {
             const percentage = Math.round((area.count / weeklyTotal) * 100);
@@ -303,11 +408,4 @@ function dueLabel(value: string, today: Date) {
   if (diff === 0) return "Prazo hoje";
   if (diff === 1) return "Prazo amanhã";
   return `Prazo em ${diff} dias`;
-}
-
-function formatMinutes(minutes: number) {
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const remainder = minutes % 60;
-  return remainder ? `${hours}h${String(remainder).padStart(2, "0")}` : `${hours}h`;
 }
