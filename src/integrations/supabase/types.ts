@@ -121,6 +121,77 @@ export type Database = {
         }
         Relationships: []
       }
+      reward_transactions: {
+        Row: {
+          coin_amount: number
+          created_at: string
+          id: string
+          reward_id: string | null
+          reward_title: string | null
+          transaction_type: string
+          user_id: string
+          xp_amount: number
+        }
+        Insert: {
+          coin_amount: number
+          created_at?: string
+          id?: string
+          reward_id?: string | null
+          reward_title?: string | null
+          transaction_type: string
+          user_id: string
+          xp_amount?: number
+        }
+        Update: {
+          coin_amount?: number
+          created_at?: string
+          id?: string
+          reward_id?: string | null
+          reward_title?: string | null
+          transaction_type?: string
+          user_id?: string
+          xp_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reward_transactions_reward_id_fkey"
+            columns: ["reward_id"]
+            isOneToOne: false
+            referencedRelation: "rewards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rewards: {
+        Row: {
+          coin_cost: number
+          created_at: string
+          id: string
+          is_active: boolean
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          coin_cost: number
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          coin_cost?: number
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       subtasks: {
         Row: {
           created_at: string
@@ -289,7 +360,29 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      convert_xp_to_coins: {
+        Args: { p_coins: number }
+        Returns: {
+          available_xp: number
+          coin_balance: number
+        }[]
+      }
+      get_reward_wallet_summary: {
+        Args: never
+        Returns: {
+          available_xp: number
+          coin_balance: number
+          converted_xp: number
+          total_earned_xp: number
+        }[]
+      }
+      purchase_reward: {
+        Args: { p_reward_id: string }
+        Returns: {
+          coin_balance: number
+          purchased_title: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
