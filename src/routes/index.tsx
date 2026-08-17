@@ -7,6 +7,7 @@ import {
   Edit3,
   Flame,
   FolderPlus,
+  Gift,
   House,
   ListTodo,
   LogOut,
