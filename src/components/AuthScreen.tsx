@@ -46,7 +46,7 @@ export function AuthScreen() {
             <Sparkles className="size-5" />
           </div>
           <div>
-            <p className="text-sm font-medium text-slate-500">TaskMaster Quest</p>
+            <p className="text-sm font-medium text-slate-500">Vamo Dale!!</p>
             <h1 className="font-bold">Sistema pessoal de missões</h1>
           </div>
         </div>

@@ -49,13 +49,13 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "TaskMaster Quest — Sistema pessoal de missões" },
+      { title: "Vamo Dale!! — Sistema pessoal de missões" },
       {
         name: "description",
         content:
           "Organize tarefas por área da vida, projetos e tags, com XP gamificado para manter o foco.",
       },
-      { property: "og:title", content: "TaskMaster Quest — Sistema pessoal de missões" },
+      { property: "og:title", content: "Vamo Dale!! — Sistema pessoal de missões" },
       {
         property: "og:description",
         content: "Gerencie suas missões diárias com prazos, subtarefas e XP conquistado.",
@@ -344,7 +344,7 @@ function TaskMaster({ userId }: { userId: string }) {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
           <div className="flex items-center gap-3">
             <div className="grid size-10 place-items-center rounded-2xl bg-slate-950 text-white"><Sparkles className="size-5" /></div>
-            <div><p className="text-sm font-medium text-slate-500">TaskMaster Quest</p><h1 className="font-bold">Sistema pessoal de missões</h1></div>
+            <div><p className="text-sm font-medium text-slate-500">Vamo Dale!!</p><h1 className="font-bold">Sistema pessoal de missões</h1></div>
           </div>
           <div className="flex items-center gap-2">
             <div className="hidden gap-2 sm:flex"><Pill>{tasks.length} tarefas</Pill><Pill>⚡ {completedXp} XP conquistados</Pill></div>
