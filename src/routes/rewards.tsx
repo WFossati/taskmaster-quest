@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, LogOut, Sparkles } from "lucide-react";
+import { ArrowLeft, LogOut, ShieldAlert, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AuthScreen } from "@/components/AuthScreen";
@@ -44,6 +44,7 @@ function RewardsPage() {
             <div><p className="text-sm font-medium text-slate-500">Vamo Dale!!</p><h1 className="font-bold">Loja de recompensas</h1></div>
           </div>
           <div className="flex items-center gap-2">
+            <Link to="/demerits" className="flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-100"><ShieldAlert className="size-4" /> <span className="hidden sm:inline">Deméritos</span></Link>
             <Link to="/" className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50"><ArrowLeft className="size-4" /> <span className="hidden sm:inline">Voltar</span></Link>
             <button type="button" title="Sair" onClick={() => void supabase.auth.signOut()} className="grid size-9 place-items-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900"><LogOut className="size-4" /></button>
           </div>
