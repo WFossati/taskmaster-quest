@@ -364,6 +364,7 @@ function TaskMaster({ userId }: { userId: string }) {
           <button onClick={openNewTask} className={`flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${tab === "new" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><Plus className="size-4" /> Nova missão</button>
           <button onClick={() => setTab("tasks")} className={`flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${tab === "tasks" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><ListTodo className="size-4" /> Minhas tarefas</button>
           <Link to="/rewards" className="flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"><Gift className="size-4" /> Recompensas</Link>
+          <Link to="/demerits" className="flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-red-600 transition hover:bg-red-50"><span aria-hidden="true">⚠</span> Deméritos</Link>
         </div>
 
         {tab === "home" ? (
