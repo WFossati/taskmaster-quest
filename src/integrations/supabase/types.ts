@@ -14,6 +14,89 @@ export type Database = {
   }
   public: {
     Tables: {
+      habit_completions: {
+        Row: {
+          completed_on: string
+          created_at: string
+          habit_id: string
+          id: string
+          note: string | null
+          user_id: string
+          xp_earned: number
+        }
+        Insert: {
+          completed_on?: string
+          created_at?: string
+          habit_id: string
+          id?: string
+          note?: string | null
+          user_id: string
+          xp_earned?: number
+        }
+        Update: {
+          completed_on?: string
+          created_at?: string
+          habit_id?: string
+          id?: string
+          note?: string | null
+          user_id?: string
+          xp_earned?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "habit_completions_habit_id_fkey"
+            columns: ["habit_id"]
+            isOneToOne: false
+            referencedRelation: "habits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      habits: {
+        Row: {
+          area: string
+          created_at: string
+          description: string | null
+          frequency: string
+          id: string
+          is_active: boolean
+          name: string
+          target_per_week: number
+          updated_at: string
+          user_id: string
+          weekdays: number[]
+          xp_reward: number
+        }
+        Insert: {
+          area: string
+          created_at?: string
+          description?: string | null
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          target_per_week?: number
+          updated_at?: string
+          user_id: string
+          weekdays?: number[]
+          xp_reward?: number
+        }
+        Update: {
+          area?: string
+          created_at?: string
+          description?: string | null
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          target_per_week?: number
+          updated_at?: string
+          user_id?: string
+          weekdays?: number[]
+          xp_reward?: number
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           created_at: string
