@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import { supabase } from "@/integrations/supabase/client";
 import {
   fetchHabits,
   toggleHabitCompletion,
@@ -116,23 +117,19 @@ function habitIsDueToday(habit: Habit, today: Date) {
 }
 
 export function HomeDashboard({
-  userId,
   tasks,
   projects,
   loading,
   onNewTask,
   onOpenTasks,
-  onOpenHabits,
   onEditTask,
   onCompleteTask,
 }: {
-  userId: string;
   tasks: Task[];
   projects: Project[];
   loading: boolean;
   onNewTask: () => void;
   onOpenTasks: () => void;
-  onOpenHabits: () => void;
   onEditTask: (task: Task) => void;
   onCompleteTask: (task: Task) => void;
 }) {
@@ -151,7 +148,7 @@ export function HomeDashboard({
 
   useEffect(() => {
     void reloadHabits();
-  }, [userId]);
+  }, []);
 
   const now = new Date();
   const today = dateOnly(now);
@@ -197,7 +194,6 @@ export function HomeDashboard({
   const habitXpToday = completedHabitsToday.reduce((sum, habit) => sum + habit.xpReward, 0);
   const xpToday = taskXpToday + habitXpToday;
   const availableXpToday = todayTasks.reduce((sum, task) => sum + taskXp(task), 0) + pendingHabitsToday.reduce((sum, habit) => sum + habit.xpReward, 0);
-  const minutesToday = todayTasks.reduce((sum, task) => sum + Number(task.duration || 0), 0);
   const totalDayItems = todayTasks.length + completedToday.length + habitsToday.length;
   const completedDayItems = completedToday.length + completedHabitsToday.length;
   const progress = totalDayItems === 0 ? 0 : Math.round((completedDayItems / totalDayItems) * 100);
@@ -218,7 +214,9 @@ export function HomeDashboard({
   async function toggleHabit(habit: Habit) {
     setHabitSavingId(habit.id);
     try {
-      await toggleHabitCompletion(userId, habit, todayKey);
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) return;
+      await toggleHabitCompletion(data.user.id, habit, todayKey);
       await reloadHabits();
     } finally {
       setHabitSavingId(null);
@@ -241,21 +239,16 @@ export function HomeDashboard({
           <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{greeting(now)} 👋</h2>
           <p className="mt-2 capitalize text-slate-500">{formatLongDate(now)}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={onOpenHabits} className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50">
-            <Repeat2 className="size-4" /> Criar hábito
-          </button>
-          <button onClick={onNewTask} className="flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3.5 text-sm font-bold text-white shadow-sm hover:bg-slate-800">
-            <Plus className="size-4" /> Nova missão
-          </button>
-        </div>
+        <button onClick={onNewTask} className="flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3.5 text-sm font-bold text-white shadow-sm hover:bg-slate-800">
+          <Plus className="size-4" /> Nova missão
+        </button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon={<CalendarDays className="size-5" />} label="Missões hoje" value={String(todayTasks.length + habitsToday.length)} helper={`${completedDayItems} concluídas hoje`} />
         <MetricCard icon={<AlertTriangle className="size-5" />} label="Atrasadas" value={String(overdueTasks.length)} helper={overdueTasks.length ? "Precisam de atenção" : "Tudo em dia ✨"} tone={overdueTasks.length ? "danger" : "neutral"} />
         <MetricCard icon={<Zap className="size-5" />} label="XP disponível" value={`${availableXpToday} XP`} helper={`+${xpToday} XP conquistados hoje`} />
-        <MetricCard icon={<Repeat2 className="size-5" />} label="Hábitos hoje" value={`${completedHabitsToday.length}/${habitsToday.length}`} helper={habitsToday.length ? "Check-ins do dia" : "Nenhum hábito programado"} />
+        <MetricCard icon={<Repeat2 className="size-5" />} label="Hábitos hoje" value={`${completedHabitsToday.length}/${habitsToday.length}`} helper={habitsToday.length ? "Check-ins do dia" : "Crie na aba Hábitos"} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.45fr_0.75fr]">
@@ -302,8 +295,8 @@ export function HomeDashboard({
 
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-          <div><p className="text-sm font-bold text-slate-900">Hábitos de hoje</p><p className="mt-1 text-sm text-slate-500">Aparecem como missões diárias. Marque quando concluir.</p></div>
-          <button onClick={onOpenHabits} className="text-sm font-bold text-violet-600">Gerenciar hábitos</button>
+          <div><p className="text-sm font-bold text-slate-900">Hábitos de hoje</p><p className="mt-1 text-sm text-slate-500">Eles funcionam como tarefas recorrentes e voltam automaticamente no próximo dia programado.</p></div>
+          <span className="rounded-full bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700">Crie novos na aba Hábitos</span>
         </div>
         <div className="mt-5 space-y-3">
           {habitsToday.length ? habitsToday.map((habit) => {
@@ -335,8 +328,7 @@ export function HomeDashboard({
             <div className="rounded-2xl bg-slate-50 px-5 py-8 text-center">
               <Repeat2 className="mx-auto mb-3 size-7 text-slate-300" />
               <p className="font-bold text-slate-700">Nenhum hábito para hoje</p>
-              <p className="mt-1 text-sm text-slate-500">Crie um hábito e ele aparecerá aqui automaticamente nos dias programados.</p>
-              <button onClick={onOpenHabits} className="mt-4 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white">Criar meu primeiro hábito</button>
+              <p className="mt-1 text-sm text-slate-500">Abra a aba Hábitos para criar um hábito diário ou escolher dias específicos.</p>
             </div>
           )}
         </div>
