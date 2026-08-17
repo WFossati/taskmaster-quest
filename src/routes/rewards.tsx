@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/rewards")({
   head: () => ({
     meta: [
-      { title: "Recompensas — TaskMaster Quest" },
+      { title: "Recompensas — Vamo Dale!!" },
       { name: "description", content: "Converta XP em moedas e use suas moedas na sua loja pessoal de recompensas." },
     ],
   }),
@@ -41,7 +41,7 @@ function RewardsPage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 lg:px-8">
           <div className="flex items-center gap-3">
             <div className="grid size-10 place-items-center rounded-2xl bg-slate-950 text-white"><Sparkles className="size-5" /></div>
-            <div><p className="text-sm font-medium text-slate-500">TaskMaster Quest</p><h1 className="font-bold">Loja de recompensas</h1></div>
+            <div><p className="text-sm font-medium text-slate-500">Vamo Dale!!</p><h1 className="font-bold">Loja de recompensas</h1></div>
           </div>
           <div className="flex items-center gap-2">
             <Link to="/" className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50"><ArrowLeft className="size-4" /> <span className="hidden sm:inline">Voltar</span></Link>
