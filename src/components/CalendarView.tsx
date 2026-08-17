@@ -263,7 +263,7 @@ function MonthView({ dates, anchor, today, tasksByDate, projectMap, onEditTask }
                   {dayTasks.length > 0 && <span className="text-[11px] font-bold text-slate-300">{dayTasks.length}</span>}
                 </div>
                 <div className="space-y-1.5">
-                  {dayTasks.slice(0, 3).map((task) => <MonthTask key={task.id} task={task} project={projectMap.get(task.projectId)} onClick={() => onEditTask(task)} />)}
+                  {dayTasks.slice(0, 3).map((task) => <MonthTask key={task.id} task={task} project={projectMap.get(task.projectId) ?? ""} onClick={() => onEditTask(task)} />)}
                   {dayTasks.length > 3 && <p className="px-1 text-xs font-bold text-slate-400">+ {dayTasks.length - 3} missões</p>}
                 </div>
               </div>
@@ -276,7 +276,7 @@ function MonthView({ dates, anchor, today, tasksByDate, projectMap, onEditTask }
 }
 
 function MonthTask({ task, project, onClick }: { task: Task; project?: string; onClick: () => void }) {
-  const area = AREAS[task.area] ?? AREAS.fejers;
+  const area = (AREAS[task.area] ?? AREAS["fejers"]) as AreaStyle;
   const done = task.status === "Concluída";
   return (
     <button type="button" onClick={onClick} className={`w-full rounded-lg border px-2 py-1.5 text-left transition hover:brightness-95 ${area.chip} ${area.border} ${done ? "opacity-50" : ""}`}>
@@ -311,7 +311,7 @@ function WeekView({ dates, today, tasksByDate, projectMap, onEditTask, onComplet
               </div>
               <div className="space-y-2">
                 {tasks.length === 0 ? <p className="py-5 text-center text-xs font-medium text-slate-300">Livre</p> : tasks.map((task) => (
-                  <WeekTask key={task.id} task={task} project={projectMap.get(task.projectId)} onEdit={() => onEditTask(task)} onComplete={() => onCompleteTask(task)} />
+                  <WeekTask key={task.id} task={task} project={projectMap.get(task.projectId) ?? ""} onEdit={() => onEditTask(task)} onComplete={() => onCompleteTask(task)} />
                 ))}
               </div>
             </div>
@@ -323,7 +323,7 @@ function WeekView({ dates, today, tasksByDate, projectMap, onEditTask, onComplet
 }
 
 function WeekTask({ task, project, onEdit, onComplete }: { task: Task; project?: string; onEdit: () => void; onComplete: () => void }) {
-  const area = AREAS[task.area] ?? AREAS.fejers;
+  const area = (AREAS[task.area] ?? AREAS["fejers"]) as AreaStyle;
   const done = task.status === "Concluída";
   return (
     <div className={`rounded-xl border p-2.5 ${area.border} ${done ? "bg-slate-50 opacity-60" : "bg-white"}`}>
