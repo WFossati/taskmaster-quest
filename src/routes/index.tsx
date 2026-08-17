@@ -242,7 +242,6 @@ function TaskMaster({ userId }: { userId: string }) {
       ...form,
       title: form.title.trim(),
       description: form.description.trim(),
-      xp: xpPreview,
     };
     const wasEditing = editingId;
     await run(async () => {
@@ -405,7 +404,7 @@ function TaskMaster({ userId }: { userId: string }) {
                 </div>
               </Card>
 
-              <Card><SectionTitle title="Planejamento" subtitle="Prazo, esforço e energia." />
+              <Card><SectionTitle title="Planejamento" subtitle="Prazo, esforço, energia e recompensa." />
                 <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
                   <Field label="Prioridade"><Select value={form.priority} onChange={(v) => set("priority", v)} options={priorityOptions} /></Field>
                   <Field label="Prazo"><input type="date" value={form.dueDate} onChange={(e) => set("dueDate", e.target.value)} className="input" /></Field>
@@ -414,6 +413,12 @@ function TaskMaster({ userId }: { userId: string }) {
                   <Field label="Dificuldade"><Select value={form.difficulty} onChange={(v) => set("difficulty", v)} options={difficultyOptions} /></Field>
                   <Field label="Recorrência"><Select value={form.recurrence} onChange={(v) => set("recurrence", v)} options={recurrenceOptions} /></Field>
                   <Field label="Status"><Select value={form.status} onChange={(v) => set("status", v)} options={statusOptions} /></Field>
+                  <Field label="XP">
+                    <input type="number" min="0" step="5" value={form.xp} onChange={(e) => set("xp", Math.max(0, Number(e.target.value) || 0))} className="input" />
+                    <button type="button" onClick={() => set("xp", xpPreview)} className="mt-1.5 block text-left text-xs font-semibold text-violet-600 hover:underline">
+                      Usar sugestão: {xpPreview} XP
+                    </button>
+                  </Field>
                 </div>
               </Card>
 
@@ -429,7 +434,7 @@ function TaskMaster({ userId }: { userId: string }) {
             </section>
 
             <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-              <Card><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Prévia da missão</p><h3 className="mt-3 text-lg font-bold">{form.title || "Sua nova missão"}</h3><div className="mt-4 space-y-3 text-sm"><Meta label="Área" value={AREAS.find((a) => a.id === form.area)?.name ?? "—"} /><Meta label="Projeto" value={projectName(form.projectId) || "Sem projeto"} /><Meta label="Prioridade" value={form.priority} /><Meta label="Dificuldade" value={form.difficulty} /><Meta label="Energia" value={form.energy} /><Meta label="Duração" value={`${form.duration || 0} min`} /><Meta label="XP estimado" value={`${xpPreview} XP`} /></div></Card>
+              <Card><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Prévia da missão</p><h3 className="mt-3 text-lg font-bold">{form.title || "Sua nova missão"}</h3><div className="mt-4 space-y-3 text-sm"><Meta label="Área" value={AREAS.find((a) => a.id === form.area)?.name ?? "—"} /><Meta label="Projeto" value={projectName(form.projectId) || "Sem projeto"} /><Meta label="Prioridade" value={form.priority} /><Meta label="Dificuldade" value={form.difficulty} /><Meta label="Energia" value={form.energy} /><Meta label="Duração" value={`${form.duration || 0} min`} /><Meta label="XP da missão" value={`${form.xp} XP`} /></div></Card>
               <button type="submit" disabled={saving} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-4 font-bold text-white shadow-lg shadow-slate-200 hover:bg-slate-800 disabled:opacity-60"><Check className="size-5" />{saving ? "Salvando..." : editingId ? "Salvar alterações" : "Criar missão"}</button>
               {editingId && <button type="button" onClick={() => { setEditingId(null); setForm(emptyForm); }} className="w-full rounded-2xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-600">Cancelar edição</button>}
             </aside>
