@@ -20,6 +20,7 @@ export type RewardTransaction = {
 
 export type WalletSummary = {
   totalEarnedXp: number;
+  netXp: number;
   convertedXp: number;
   availableXp: number;
   coinBalance: number;
@@ -71,6 +72,7 @@ export async function fetchWalletSummary(): Promise<WalletSummary> {
   const row = rows[0] ?? {};
   return {
     totalEarnedXp: Number(row.total_earned_xp ?? 0),
+    netXp: Number(row.net_xp ?? 0),
     convertedXp: Number(row.converted_xp ?? 0),
     availableXp: Number(row.available_xp ?? 0),
     coinBalance: Number(row.coin_balance ?? 0),
