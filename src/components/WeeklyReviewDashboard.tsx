@@ -44,14 +44,16 @@ const AREA_NAMES: Record<string, string> = {
   financeiro: "Financeiro",
 };
 
-const AREA_STYLES: Record<string, { bar: string; soft: string; text: string }> = {
+const AREA_STYLES = {
   fejers: { bar: "bg-red-500", soft: "bg-red-50", text: "text-red-700" },
   gera: { bar: "bg-emerald-500", soft: "bg-emerald-50", text: "text-emerald-700" },
   ufrgs: { bar: "bg-amber-400", soft: "bg-amber-50", text: "text-amber-700" },
   saude: { bar: "bg-blue-500", soft: "bg-blue-50", text: "text-blue-700" },
   conhecimento: { bar: "bg-pink-500", soft: "bg-pink-50", text: "text-pink-700" },
   financeiro: { bar: "bg-purple-500", soft: "bg-purple-50", text: "text-purple-700" },
-};
+} satisfies Record<string, { bar: string; soft: string; text: string }>;
+
+const FALLBACK_AREA_STYLE = { bar: "bg-slate-400", soft: "bg-slate-50", text: "text-slate-700" };
 
 function iso(date: Date) {
   return date.toISOString().slice(0, 10);
@@ -220,7 +222,6 @@ export function WeeklyReviewDashboard({ userId }: { userId: string }) {
   const totalAreaActivity = areas.reduce((sum, item) => sum + item.activityCount, 0);
   const visibleEvolution = evolution.slice(-range);
   const maxEvolutionXp = Math.max(1, ...visibleEvolution.map((w) => Math.max(w.xpGained, w.xpLost)));
-  const maxTasks = Math.max(1, ...visibleEvolution.map((w) => w.tasksCompleted));
 
   const insight = (() => {
     if (!previous) return "Continue registrando suas semanas para o Vamo Dale!! construir comparações mais inteligentes.";
@@ -303,7 +304,7 @@ export function WeeklyReviewDashboard({ userId }: { userId: string }) {
           <div className="mt-5 space-y-4">
             {areas.map((item) => {
               const pct = totalAreaActivity ? Math.round((item.activityCount / totalAreaActivity) * 100) : 0;
-              const style = AREA_STYLES[item.area] ?? AREA_STYLES.fejers;
+              const style = AREA_STYLES[item.area as keyof typeof AREA_STYLES] ?? FALLBACK_AREA_STYLE;
               return <div key={item.area}>
                 <div className="mb-1.5 flex items-center justify-between text-sm"><span className="font-bold text-slate-700">{AREA_NAMES[item.area] ?? item.area}</span><span className="font-semibold text-slate-400">{pct}% · {item.activityCount}</span></div>
                 <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${style.bar}`} style={{ width: `${pct}%` }} /></div>
@@ -424,7 +425,7 @@ function MiniStat({ label, value }: { label: string; value: number }) {
 }
 
 function AreaBadge({ label, area }: { label: string; area: string }) {
-  const style = AREA_STYLES[area] ?? { soft: "bg-slate-50", text: "text-slate-700", bar: "bg-slate-400" };
+  const style = AREA_STYLES[area as keyof typeof AREA_STYLES] ?? FALLBACK_AREA_STYLE;
   return <div className={`rounded-2xl p-3 ${style.soft}`}><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p><p className={`mt-1 text-sm font-black ${style.text}`}>{AREA_NAMES[area] ?? area ?? "—"}</p></div>;
 }
 
