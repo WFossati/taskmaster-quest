@@ -14,6 +14,131 @@ export type Database = {
   }
   public: {
     Tables: {
+      books: {
+        Row: {
+          author: string
+          cover_url: string | null
+          created_at: string
+          current_page: number
+          finished_at: string | null
+          id: string
+          notes: string | null
+          primary_category: string
+          started_at: string | null
+          status: string
+          tags: string[]
+          title: string
+          total_pages: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          author?: string
+          cover_url?: string | null
+          created_at?: string
+          current_page?: number
+          finished_at?: string | null
+          id?: string
+          notes?: string | null
+          primary_category?: string
+          started_at?: string | null
+          status?: string
+          tags?: string[]
+          title: string
+          total_pages?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          author?: string
+          cover_url?: string | null
+          created_at?: string
+          current_page?: number
+          finished_at?: string | null
+          id?: string
+          notes?: string | null
+          primary_category?: string
+          started_at?: string | null
+          status?: string
+          tags?: string[]
+          title?: string
+          total_pages?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      demerit_occurrences: {
+        Row: {
+          created_at: string
+          demerit_id: string
+          id: string
+          note: string | null
+          occurred_on: string
+          user_id: string
+          xp_lost: number
+        }
+        Insert: {
+          created_at?: string
+          demerit_id: string
+          id?: string
+          note?: string | null
+          occurred_on?: string
+          user_id: string
+          xp_lost: number
+        }
+        Update: {
+          created_at?: string
+          demerit_id?: string
+          id?: string
+          note?: string | null
+          occurred_on?: string
+          user_id?: string
+          xp_lost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demerit_occurrences_demerit_id_fkey"
+            columns: ["demerit_id"]
+            isOneToOne: false
+            referencedRelation: "demerits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      demerits: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          is_active: boolean
+          title: string
+          updated_at: string
+          user_id: string
+          xp_penalty: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          is_active?: boolean
+          title: string
+          updated_at?: string
+          user_id: string
+          xp_penalty?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          is_active?: boolean
+          title?: string
+          updated_at?: string
+          user_id?: string
+          xp_penalty?: number
+        }
+        Relationships: []
+      }
       habit_completions: {
         Row: {
           completed_on: string
@@ -94,6 +219,45 @@ export type Database = {
           user_id?: string
           weekdays?: number[]
           xp_reward?: number
+        }
+        Relationships: []
+      }
+      investments: {
+        Row: {
+          asset_type: string
+          created_at: string
+          earnings: number
+          id: string
+          institution: string
+          invested_value: number
+          name: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asset_type: string
+          created_at?: string
+          earnings?: number
+          id?: string
+          institution: string
+          invested_value?: number
+          name: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          asset_type?: string
+          created_at?: string
+          earnings?: number
+          id?: string
+          institution?: string
+          invested_value?: number
+          name?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -355,6 +519,54 @@ export type Database = {
           },
         ]
       }
+      weekly_reviews: {
+        Row: {
+          created_at: string
+          execution_goal: number
+          focus_1: string
+          focus_2: string
+          focus_3: string
+          id: string
+          next_week_priority: string
+          pending_notes: string
+          priority_habit: string
+          updated_at: string
+          user_id: string
+          week_start: string
+          wins: string
+        }
+        Insert: {
+          created_at?: string
+          execution_goal?: number
+          focus_1?: string
+          focus_2?: string
+          focus_3?: string
+          id?: string
+          next_week_priority?: string
+          pending_notes?: string
+          priority_habit?: string
+          updated_at?: string
+          user_id: string
+          week_start: string
+          wins?: string
+        }
+        Update: {
+          created_at?: string
+          execution_goal?: number
+          focus_1?: string
+          focus_2?: string
+          focus_3?: string
+          id?: string
+          next_week_priority?: string
+          pending_notes?: string
+          priority_habit?: string
+          updated_at?: string
+          user_id?: string
+          week_start?: string
+          wins?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -376,11 +588,82 @@ export type Database = {
           total_earned_xp: number
         }[]
       }
+      get_weekly_area_breakdown: {
+        Args: { p_week_start: string }
+        Returns: {
+          activity_count: number
+          area: string
+        }[]
+      }
+      get_weekly_dashboard_metrics: {
+        Args: { p_week_start: string }
+        Returns: {
+          completed_planned_tasks: number
+          demerit_occurrences: number
+          execution_rate: number
+          habit_completion_rate: number
+          habit_target: number
+          planned_tasks: number
+          week_end: string
+          week_start: string
+        }[]
+      }
+      get_weekly_demerit_breakdown: {
+        Args: { p_week_start: string }
+        Returns: {
+          demerit_id: string
+          occurrences: number
+          title: string
+          xp_lost: number
+        }[]
+      }
+      get_weekly_habit_breakdown: {
+        Args: { p_week_start: string }
+        Returns: {
+          area: string
+          completed: number
+          habit_id: string
+          habit_name: string
+          target: number
+        }[]
+      }
+      get_weekly_review_metrics: {
+        Args: { p_week_start: string }
+        Returns: {
+          habits_completed: number
+          neglected_area: string
+          overdue_tasks: number
+          pending_tasks: number
+          planned_minutes: number
+          tasks_completed: number
+          top_area: string
+          week_end: string
+          week_start: string
+          xp_gained: number
+          xp_lost: number
+        }[]
+      }
+      get_weekly_review_pending_tasks: {
+        Args: { p_week_start: string }
+        Returns: {
+          area: string
+          due_date: string
+          id: string
+          title: string
+        }[]
+      }
       purchase_reward: {
         Args: { p_reward_id: string }
         Returns: {
           coin_balance: number
           purchased_title: string
+        }[]
+      }
+      record_demerit: {
+        Args: { p_demerit_id: string; p_note?: string }
+        Returns: {
+          occurrence_id: string
+          xp_lost: number
         }[]
       }
     }
