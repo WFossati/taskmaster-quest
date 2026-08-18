@@ -366,6 +366,7 @@ function TaskMaster({ userId }: { userId: string }) {
           <Link to="/rewards" className="flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"><Gift className="size-4" /> Recompensas</Link>
           <Link to="/demerits" className="flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-red-600 transition hover:bg-red-50"><span aria-hidden="true">⚠</span> Deméritos</Link>
           <Link to="/investments" className="flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50"><span aria-hidden="true">📈</span> Investimentos</Link>
+          <Link to="/weekly-review" className="flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-violet-700 transition hover:bg-violet-50"><span aria-hidden="true">📊</span> Minha Semana</Link>
         </div>
 
         {tab === "home" ? (
