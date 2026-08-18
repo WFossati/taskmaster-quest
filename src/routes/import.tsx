@@ -269,7 +269,7 @@ function ImportMissionsPage() {
             value={text}
             onChange={(event) => setText(event.target.value)}
             className="mt-6 min-h-72 w-full rounded-2xl border border-slate-200 p-4 text-sm outline-none focus:border-violet-400"
-            placeholder={'Ex.:\nPrazo 20/08, 10 XP, área "Gera".\n\n## CLIENTE\n* [ ] Preparar apresentação'}
+            placeholder={'Ex.:\nPrazo 20/08, 10 XP, área "Gera".\n\n[Cliente] - Preparar apresentação'}
           />
           <button
             type="button"
