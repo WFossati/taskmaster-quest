@@ -16,6 +16,7 @@ import {
   Sparkles,
   Tag,
   Trash2,
+  UserRound,
   X,
   Zap,
 } from "lucide-react";
@@ -367,6 +368,7 @@ function TaskMaster({ userId }: { userId: string }) {
           <Link to="/demerits" className="flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"><X className="size-4" /> Deméritos</Link>
           <Link to="/investments" className="flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"><Zap className="size-4" /> Investimentos</Link>
           <Link to="/weekly-review" className="flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"><ListTodo className="size-4" /> Dashboard</Link>
+          <Link to="/profile" className="flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"><UserRound className="size-4" /> Perfil</Link>
         </div>
 
         {tab === "home" ? (
