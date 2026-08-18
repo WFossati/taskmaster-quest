@@ -10,81 +10,183 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as RewardsRouteImport } from './routes/rewards'
 import { Route as DemeritsRouteImport } from './routes/demerits'
 import { Route as InvestmentsRouteImport } from './routes/investments'
-import { Route as WeeklyReviewRouteImport } from './routes/weekly-review'
-import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as LibraryRouteImport } from './routes/library'
+import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as RewardsRouteImport } from './routes/rewards'
+import { Route as WeeklyReviewRouteImport } from './routes/weekly-review'
 
-const IndexRoute = IndexRouteImport.update({ id: '/', path: '/', getParentRoute: () => rootRouteImport } as any)
-const RewardsRoute = RewardsRouteImport.update({ id: '/rewards', path: '/rewards', getParentRoute: () => rootRouteImport } as any)
-const DemeritsRoute = DemeritsRouteImport.update({ id: '/demerits', path: '/demerits', getParentRoute: () => rootRouteImport } as any)
-const InvestmentsRoute = InvestmentsRouteImport.update({ id: '/investments', path: '/investments', getParentRoute: () => rootRouteImport } as any)
-const WeeklyReviewRoute = WeeklyReviewRouteImport.update({ id: '/weekly-review', path: '/weekly-review', getParentRoute: () => rootRouteImport } as any)
-const ProfileRoute = ProfileRouteImport.update({ id: '/profile', path: '/profile', getParentRoute: () => rootRouteImport } as any)
-const LibraryRoute = LibraryRouteImport.update({ id: '/library', path: '/library', getParentRoute: () => rootRouteImport } as any)
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DemeritsRoute = DemeritsRouteImport.update({
+  id: '/demerits',
+  path: '/demerits',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InvestmentsRoute = InvestmentsRouteImport.update({
+  id: '/investments',
+  path: '/investments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LibraryRoute = LibraryRouteImport.update({
+  id: '/library',
+  path: '/library',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RewardsRoute = RewardsRouteImport.update({
+  id: '/rewards',
+  path: '/rewards',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WeeklyReviewRoute = WeeklyReviewRouteImport.update({
+  id: '/weekly-review',
+  path: '/weekly-review',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/rewards': typeof RewardsRoute
   '/demerits': typeof DemeritsRoute
   '/investments': typeof InvestmentsRoute
-  '/weekly-review': typeof WeeklyReviewRoute
-  '/profile': typeof ProfileRoute
   '/library': typeof LibraryRoute
+  '/profile': typeof ProfileRoute
+  '/rewards': typeof RewardsRoute
+  '/weekly-review': typeof WeeklyReviewRoute
 }
-export interface FileRoutesByTo extends FileRoutesByFullPath {}
+export interface FileRoutesByTo {
+  '/': typeof IndexRoute
+  '/demerits': typeof DemeritsRoute
+  '/investments': typeof InvestmentsRoute
+  '/library': typeof LibraryRoute
+  '/profile': typeof ProfileRoute
+  '/rewards': typeof RewardsRoute
+  '/weekly-review': typeof WeeklyReviewRoute
+}
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/rewards': typeof RewardsRoute
   '/demerits': typeof DemeritsRoute
   '/investments': typeof InvestmentsRoute
-  '/weekly-review': typeof WeeklyReviewRoute
-  '/profile': typeof ProfileRoute
   '/library': typeof LibraryRoute
+  '/profile': typeof ProfileRoute
+  '/rewards': typeof RewardsRoute
+  '/weekly-review': typeof WeeklyReviewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/rewards' | '/demerits' | '/investments' | '/weekly-review' | '/profile' | '/library'
+  fullPaths:
+    | '/'
+    | '/demerits'
+    | '/investments'
+    | '/library'
+    | '/profile'
+    | '/rewards'
+    | '/weekly-review'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/rewards' | '/demerits' | '/investments' | '/weekly-review' | '/profile' | '/library'
-  id: '__root__' | '/' | '/rewards' | '/demerits' | '/investments' | '/weekly-review' | '/profile' | '/library'
+  to:
+    | '/'
+    | '/demerits'
+    | '/investments'
+    | '/library'
+    | '/profile'
+    | '/rewards'
+    | '/weekly-review'
+  id:
+    | '__root__'
+    | '/'
+    | '/demerits'
+    | '/investments'
+    | '/library'
+    | '/profile'
+    | '/rewards'
+    | '/weekly-review'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  RewardsRoute: typeof RewardsRoute
   DemeritsRoute: typeof DemeritsRoute
   InvestmentsRoute: typeof InvestmentsRoute
-  WeeklyReviewRoute: typeof WeeklyReviewRoute
-  ProfileRoute: typeof ProfileRoute
   LibraryRoute: typeof LibraryRoute
+  ProfileRoute: typeof ProfileRoute
+  RewardsRoute: typeof RewardsRoute
+  WeeklyReviewRoute: typeof WeeklyReviewRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': { id: '/'; path: '/'; fullPath: '/'; preLoaderRoute: typeof IndexRouteImport; parentRoute: typeof rootRouteImport }
-    '/rewards': { id: '/rewards'; path: '/rewards'; fullPath: '/rewards'; preLoaderRoute: typeof RewardsRouteImport; parentRoute: typeof rootRouteImport }
-    '/demerits': { id: '/demerits'; path: '/demerits'; fullPath: '/demerits'; preLoaderRoute: typeof DemeritsRouteImport; parentRoute: typeof rootRouteImport }
-    '/investments': { id: '/investments'; path: '/investments'; fullPath: '/investments'; preLoaderRoute: typeof InvestmentsRouteImport; parentRoute: typeof rootRouteImport }
-    '/weekly-review': { id: '/weekly-review'; path: '/weekly-review'; fullPath: '/weekly-review'; preLoaderRoute: typeof WeeklyReviewRouteImport; parentRoute: typeof rootRouteImport }
-    '/profile': { id: '/profile'; path: '/profile'; fullPath: '/profile'; preLoaderRoute: typeof ProfileRouteImport; parentRoute: typeof rootRouteImport }
-    '/library': { id: '/library'; path: '/library'; fullPath: '/library'; preLoaderRoute: typeof LibraryRouteImport; parentRoute: typeof rootRouteImport }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/demerits': {
+      id: '/demerits'
+      path: '/demerits'
+      fullPath: '/demerits'
+      preLoaderRoute: typeof DemeritsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/investments': {
+      id: '/investments'
+      path: '/investments'
+      fullPath: '/investments'
+      preLoaderRoute: typeof InvestmentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/library': {
+      id: '/library'
+      path: '/library'
+      fullPath: '/library'
+      preLoaderRoute: typeof LibraryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/rewards': {
+      id: '/rewards'
+      path: '/rewards'
+      fullPath: '/rewards'
+      preLoaderRoute: typeof RewardsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/weekly-review': {
+      id: '/weekly-review'
+      path: '/weekly-review'
+      fullPath: '/weekly-review'
+      preLoaderRoute: typeof WeeklyReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute,
-  RewardsRoute,
-  DemeritsRoute,
-  InvestmentsRoute,
-  WeeklyReviewRoute,
-  ProfileRoute,
-  LibraryRoute,
+  IndexRoute: IndexRoute,
+  DemeritsRoute: DemeritsRoute,
+  InvestmentsRoute: InvestmentsRoute,
+  LibraryRoute: LibraryRoute,
+  ProfileRoute: ProfileRoute,
+  RewardsRoute: RewardsRoute,
+  WeeklyReviewRoute: WeeklyReviewRoute,
 }
-export const routeTree = rootRouteImport._addFileChildren(rootRouteChildren)._addFileTypes<FileRouteTypes>()
+export const routeTree = rootRouteImport
+  ._addFileChildren(rootRouteChildren)
+  ._addFileTypes<FileRouteTypes>()
 
 import type { getRouter } from './router.tsx'
 import type { startInstance } from './start.ts'

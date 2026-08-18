@@ -1,4 +1,4 @@
-import { BadgeDollarSign, BookOpen, Dumbbell, Flame, Gauge, Medal, ShieldCheck, Sparkles, Trophy, Zap } from "lucide-react";
+import { BadgeDollarSign, BookOpen, Coins, Dumbbell, Flame, Gauge, Medal, ShieldCheck, Sparkles, Trophy, Zap } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { fetchProfileStats, type ProfileStats } from "@/lib/profile-data";
@@ -166,6 +166,11 @@ export function ProfileDashboard() {
         </div>
       </div>
 
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Highlight icon={<Zap className="size-6" />} label="XP total" value={new Intl.NumberFormat("pt-BR").format(stats.totalXp)} helper="XP líquido acumulado (ganhos menos deméritos)" />
+        <Highlight icon={<Coins className="size-6" />} label="Moedas" value={`${new Intl.NumberFormat("pt-BR").format(stats.coinBalance)} 🪙`} helper="Saldo atual após conversões e compras" />
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Missões concluídas" value={stats.completedTasks} />
         <Stat label="Hábitos cumpridos" value={stats.completedHabits} />
@@ -228,4 +233,15 @@ function PatchCard({ patch }: { patch: Patch }) {
 
 function Stat({ label, value }: { label: string; value: number }) {
   return <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-xs font-bold uppercase tracking-wider text-slate-400">{label}</p><p className="mt-2 text-3xl font-black text-slate-950">{value}</p></div>;
+}
+
+function Highlight({ icon, label, value, helper }: { icon: ReactNode; label: string; value: string; helper: string }) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-4 grid size-12 place-items-center rounded-2xl bg-slate-950 text-white">{icon}</div>
+      <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{label}</p>
+      <p className="mt-1 text-4xl font-black tracking-tight text-slate-950">{value}</p>
+      <p className="mt-2 text-xs font-semibold text-slate-400">{helper}</p>
+    </div>
+  );
 }
