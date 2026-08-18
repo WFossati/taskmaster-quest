@@ -31,6 +31,7 @@ type DraftMission = {
   dueDate: string;
   xp: number;
   priority: string;
+  recurrence: string;
   duplicate: boolean;
   selected: boolean;
 };
@@ -83,6 +84,17 @@ function parseDate(text: string) {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+function parseLineDate(value: string) {
+  const match = value.match(/^(\\d{1,2})[\\/](\\d{1,2})[\\/](\\d{2,4})$/);
+  if (!match) return "";
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  let year = Number(match[3]);
+  if (year < 100) year += 2000;
+  if (day < 1 || day > 31 || month < 1 || month > 12) return "";
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 function parseArea(text: string) {
   const quoted = text.match(/(?:área|parte)\s+(?:da\s+)?vida[^"'\n]*["']([^"']+)["']/i)?.[1];
   const candidate = quoted ?? Object.keys(AREAS).find((area) => normalize(text).includes(normalize(area)));
@@ -102,7 +114,7 @@ function parseMissions(text: string, existingTasks: Task[], existingProjects: Pr
   const xp = Number(text.match(/(\d+)\s*xp/i)?.[1] ?? 50);
   const area = parseArea(text);
   const lines = text.split(/\r?\n/);
-  const raw: Array<{ title: string; project: string }> = [];
+  const raw: Array<{ title: string; project: string; dueDate?: string; recurrence?: string }> = [];
   const rules: Array<{ project: string; rule: string; rank: number }> = [];
   let project = "";
   let inPriorities = false;
@@ -117,11 +129,14 @@ function parseMissions(text: string, existingTasks: Task[], existingProjects: Pr
       if (!inPriorities) project = name;
       return;
     }
-    const flatItem = line.match(/^\[([^\]]+)\]\s*[-–—:]\s*(.+)$/);
+    const flatItem = line.match(/^\[([^\]]+)\](?:\s*\[([^\]]+)\])?(?:\s*\[([^\]]+)\])?\s*[-–—:]\s*(.+)$/);
     if (flatItem && !/^\s*[xX ]\s*$/.test(flatItem[1]!)) {
       const flatProject = flatItem[1]!.replace(/\*\*/g, "").trim();
-      const flatTitle = flatItem[2]!.replace(/\*\*/g, "").trim();
-      if (flatProject && flatTitle) raw.push({ title: flatTitle, project: flatProject });
+      const tokens = [flatItem[2], flatItem[3]].filter(Boolean).map((value) => value!.trim());
+      const flatDueDate = tokens.map(parseLineDate).find(Boolean) ?? "";
+      const flatRecurrence = tokens.find((value) => /^(diariamente|semanalmente|mensalmente|personalizada)$/i.test(value)) ?? "Não se repete";
+      const flatTitle = flatItem[4]!.replace(/\*\*/g, "").trim();
+      if (flatProject && flatTitle) raw.push({ title: flatTitle, project: flatProject, dueDate: flatDueDate, recurrence: flatRecurrence });
       return;
     }
 
@@ -153,9 +168,10 @@ function parseMissions(text: string, existingTasks: Task[], existingProjects: Pr
       title: item.title,
       project: item.project,
       area,
-      dueDate,
+      dueDate: item.dueDate || dueDate,
       xp,
       priority: matchedRule ? (matchedRule.rank <= 2 ? "Urgente" : "Alta") : "Média",
+      recurrence: item.recurrence || "Não se repete",
       duplicate,
       selected: !duplicate,
     };
@@ -227,7 +243,7 @@ function ImportMissionsPage() {
           duration: "30",
           energy: "Média",
           difficulty: "Média",
-          recurrence: "Não se repete",
+          recurrence: draft.recurrence,
           subtasks: [],
           status: "Inbox",
           tagIds: [],
@@ -312,7 +328,7 @@ function ImportMissionsPage() {
                   </button>
                 </div>
                 <div className="ml-7 mt-2 flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
-                  <span>{item.area}</span><span>{item.dueDate || "Sem prazo"}</span><span>{item.xp} XP</span>
+                  <span>{item.area}</span><span>{item.dueDate || "Sem prazo"}</span><span>{item.recurrence}</span><span>{item.xp} XP</span>
                   {item.duplicate && <span className="text-amber-700">Missão equivalente já existente</span>}
                 </div>
               </article>
