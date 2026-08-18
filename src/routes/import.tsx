@@ -85,7 +85,7 @@ function parseDate(text: string) {
 }
 
 function parseLineDate(value: string) {
-  const match = value.match(/^(\\d{1,2})[\\/](\\d{1,2})[\\/](\\d{2,4})$/);
+  const match = value.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{2,4})$/);
   if (!match) return "";
   const day = Number(match[1]);
   const month = Number(match[2]);
