@@ -94,7 +94,7 @@
   --sidebar-accent: oklch(0.968 0.007 247.896);
   --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
   --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.704 0.04 256.788);
+  --sidebar-ring: oklch(0.551 0.027 264.364);
 }
 
 .dark {
@@ -140,5 +140,27 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+  }
+}
+
+@layer components {
+  .dark-input {
+    width: 100%;
+    border-radius: 0.875rem;
+    border: 1px solid rgb(255 255 255 / 0.1);
+    background: rgb(255 255 255 / 0.1);
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    color: white;
+    outline: none;
+  }
+
+  .dark-input::placeholder {
+    color: rgb(148 163 184);
+  }
+
+  .dark-input:focus {
+    border-color: rgb(196 181 253 / 0.6);
+    box-shadow: 0 0 0 2px rgb(139 92 246 / 0.18);
   }
 }
