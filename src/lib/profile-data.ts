@@ -112,7 +112,7 @@ export async function fetchProfileStats(): Promise<ProfileStats> {
   let currentStreak = 0;
   let bestStreak = 0;
   for (const score of weeklyScores) {
-    if (score >= 70) {
+    if (score > 70) {
       currentStreak += 1;
       bestStreak = Math.max(bestStreak, currentStreak);
     } else {
