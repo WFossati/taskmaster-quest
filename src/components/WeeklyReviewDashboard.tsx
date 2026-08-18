@@ -239,7 +239,7 @@ export function WeeklyReviewDashboard({ userId }: { userId: string }) {
     <section className="space-y-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <p className="text-sm font-bold uppercase tracking-[0.18em] text-violet-600">Minha Semana</p>
+          <p className="text-sm font-bold uppercase tracking-[0.18em] text-violet-600">Dashboard</p>
           <h2 className="mt-2 text-3xl font-bold tracking-tight">Dashboard de gestão pessoal</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-500">Resultado, comportamento, equilíbrio e direção para a próxima semana em uma única visão.</p>
         </div>
