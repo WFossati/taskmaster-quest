@@ -9,8 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/weekly-review")({
   head: () => ({
     meta: [
-      { title: "Minha Semana — Vamo Dale!!" },
-      { name: "description", content: "Revise sua semana, reconheça avanços e escolha a prioridade da próxima." },
+      { title: "Dashboard — Vamo Dale!!" },
+      { name: "description", content: "Acompanhe sua semana, evolução, hábitos, execução e prioridades em um único dashboard." },
     ],
   }),
   component: WeeklyReviewPage,
@@ -41,7 +41,7 @@ function WeeklyReviewPage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 lg:px-8">
           <div className="flex items-center gap-3">
             <div className="grid size-10 place-items-center rounded-2xl bg-slate-950 text-white"><Sparkles className="size-5" /></div>
-            <div><p className="text-sm font-medium text-slate-500">Vamo Dale!!</p><h1 className="font-bold">Minha Semana</h1></div>
+            <div><p className="text-sm font-medium text-slate-500">Vamo Dale!!</p><h1 className="font-bold">Dashboard</h1></div>
           </div>
           <div className="flex items-center gap-2">
             <Link to="/" className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50"><ArrowLeft className="size-4" /><span className="hidden sm:inline">Voltar</span></Link>
