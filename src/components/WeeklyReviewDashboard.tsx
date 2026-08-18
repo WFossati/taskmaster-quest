@@ -1,5 +1,5 @@
-import { ArrowLeft, ArrowRight, CalendarRange, CheckCircle2, Clock3, Flame, Save, Target, Trophy, TrendingDown, TrendingUp, Zap } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, ArrowRight, CalendarRange, CheckCircle2, Clock3, Flame, Save, Target, Trophy, TrendingDown, Zap } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import {
   fetchPendingTasks,
@@ -201,6 +201,6 @@ export function WeeklyReviewDashboard({ userId }: { userId: string }) {
   );
 }
 
-function Metric({ icon, label, value, detail }: { icon: React.ReactNode; label: string; value: string; detail: string }) {
+function Metric({ icon, label, value, detail }: { icon: ReactNode; label: string; value: string; detail: string }) {
   return <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center gap-2 text-slate-400">{icon}<span className="text-xs font-bold uppercase tracking-wider">{label}</span></div><p className="mt-3 text-2xl font-bold">{value}</p><p className="mt-1 text-xs font-semibold text-slate-400">{detail}</p></div>;
 }
