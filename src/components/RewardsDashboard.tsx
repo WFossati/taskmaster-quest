@@ -12,7 +12,7 @@ import {
   type WalletSummary,
 } from "@/lib/rewards-data";
 
-const EMPTY_SUMMARY: WalletSummary = { totalEarnedXp: 0, convertedXp: 0, availableXp: 0, coinBalance: 0 };
+const EMPTY_SUMMARY: WalletSummary = { totalEarnedXp: 0, netXp: 0, convertedXp: 0, availableXp: 0, coinBalance: 0 };
 
 export function RewardsDashboard({ userId }: { userId: string }) {
   const [summary, setSummary] = useState<WalletSummary>(EMPTY_SUMMARY);
@@ -84,18 +84,17 @@ export function RewardsDashboard({ userId }: { userId: string }) {
       {error && <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">{error}</div>}
       {feedback && <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{feedback}</div>}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric icon={<Zap className="size-5" />} label="XP conquistado" value={`${summary.totalEarnedXp.toLocaleString("pt-BR")} XP`} helper="XP histórico concluído" />
-        <Metric icon={<Sparkles className="size-5" />} label="XP disponível" value={`${summary.availableXp.toLocaleString("pt-BR")} XP`} helper={`${summary.convertedXp.toLocaleString("pt-BR")} XP já convertidos`} />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <Metric icon={<Zap className="size-5" />} label="XP líquido" value={`${summary.availableXp.toLocaleString("pt-BR")} XP`} helper="Ganhos menos deméritos e conversões" />
         <Metric icon={<Coins className="size-5" />} label="Suas moedas" value={`${summary.coinBalance} 🪙`} helper="Saldo disponível para compras" />
-        <Metric icon={<Trophy className="size-5" />} label="Pode converter" value={`${maxConvertibleCoins} 🪙`} helper="Com seu XP disponível agora" />
+        <Metric icon={<Trophy className="size-5" />} label="Pode converter" value={`${maxConvertibleCoins} 🪙`} helper="Com seu XP líquido agora" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-3xl bg-slate-950 p-6 text-white shadow-xl shadow-slate-200 sm:p-7">
           <div className="flex items-center gap-2 text-sm font-bold text-violet-300"><Coins className="size-5" /> Trocar XP por moedas</div>
           <h3 className="mt-4 text-2xl font-bold">Quanto você quer converter?</h3>
-          <p className="mt-2 text-sm leading-6 text-slate-300">Seu XP histórico continua registrado. Aqui usamos apenas o XP disponível para gerar moedas gastáveis.</p>
+          <p className="mt-2 text-sm leading-6 text-slate-300">Seu XP histórico continua registrado. Aqui usamos apenas o XP líquido disponível para gerar moedas gastáveis.</p>
           <div className="mt-6 flex items-center gap-3">
             <button type="button" onClick={() => setCoinsToConvert((current) => Math.max(1, current - 1))} className="grid size-11 place-items-center rounded-xl border border-white/15 bg-white/5 text-lg font-bold hover:bg-white/10">−</button>
             <input type="number" min="1" step="1" value={coinsToConvert} onChange={(e) => setCoinsToConvert(Math.max(1, Number(e.target.value) || 1))} className="min-w-0 flex-1 rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-center text-xl font-bold text-white outline-none" />
@@ -103,7 +102,7 @@ export function RewardsDashboard({ userId }: { userId: string }) {
           </div>
           <div className="mt-4 rounded-2xl bg-white/10 p-4 text-sm"><div className="flex justify-between gap-3"><span className="text-slate-300">Você recebe</span><strong>{coinsToConvert} moedas</strong></div><div className="mt-2 flex justify-between gap-3"><span className="text-slate-300">Custo</span><strong>{xpNeeded.toLocaleString("pt-BR")} XP</strong></div></div>
           <button type="button" disabled={!canConvert || busy} onClick={() => void run(() => convertXpToCoins(coinsToConvert), `${coinsToConvert} moeda${coinsToConvert === 1 ? "" : "s"} adicionada${coinsToConvert === 1 ? "" : "s"} ao seu saldo!`)} className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3.5 text-sm font-bold text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"><Coins className="size-4" /> Converter XP</button>
-          {!canConvert && <p className="mt-3 text-center text-xs font-semibold text-slate-400">Você precisa de {xpNeeded.toLocaleString("pt-BR")} XP disponíveis para esta troca.</p>}
+          {!canConvert && <p className="mt-3 text-center text-xs font-semibold text-slate-400">Você precisa de {xpNeeded.toLocaleString("pt-BR")} XP líquidos para esta troca.</p>}
         </div>
 
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
