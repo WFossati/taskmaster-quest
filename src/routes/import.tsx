@@ -117,6 +117,14 @@ function parseMissions(text: string, existingTasks: Task[], existingProjects: Pr
       if (!inPriorities) project = name;
       return;
     }
+    const flatItem = line.match(/^\[([^\]]+)\]\s*[-–—:]\s*(.+)$/);
+    if (flatItem && !/^\s*[xX ]\s*$/.test(flatItem[1]!)) {
+      const flatProject = flatItem[1]!.replace(/\*\*/g, "").trim();
+      const flatTitle = flatItem[2]!.replace(/\*\*/g, "").trim();
+      if (flatProject && flatTitle) raw.push({ title: flatTitle, project: flatProject });
+      return;
+    }
+
     const item = line.match(/^(?:[-*]\s*)?\[[ xX]\]\s*(.+)$/);
     if (!item) return;
     const title = item[1]!.replace(/\*\*/g, "").trim();
@@ -189,7 +197,7 @@ function ImportMissionsPage() {
   function preview() {
     const parsed = parseMissions(text, tasks, projects);
     setDrafts(parsed);
-    setFeedback(parsed.length ? "" : "Nenhuma missão foi identificada. Use títulos com ## e itens com [ ].");
+    setFeedback(parsed.length ? "" : "Nenhuma missão foi identificada. Use [Projeto] - tarefa ou títulos com ## e itens com [ ].");
   }
 
   function patch(id: string, change: Partial<DraftMission>) {
