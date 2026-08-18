@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { fetchWalletSummary } from "@/lib/rewards-data";
 import { fetchWeeklyEvolution, type WeeklyDashboardMetrics, type WeeklyMetrics } from "@/lib/weekly-review-data";
 
 const db = supabase as any;
@@ -7,6 +8,7 @@ export type ProfileStats = {
   completedTasks: number;
   completedHabits: number;
   totalXp: number;
+  coinBalance: number;
   exerciseDays: number;
   readingDays: number;
   investmentValue: number;
@@ -81,12 +83,14 @@ export async function fetchProfileStats(): Promise<ProfileStats> {
     { data: demerits, error: demeritError },
     { data: investments, error: investmentError },
     weeklyEvolution,
+    wallet,
   ] = await Promise.all([
     db.from("tasks").select("xp_reward,status,completed_at").eq("status", "Concluída"),
     db.from("habit_completions").select("completed_on,xp_earned,habits(name)"),
     db.from("demerit_occurrences").select("occurred_on"),
     db.from("investments").select("invested_value,earnings"),
     fetchWeeklyEvolution(weekStarts),
+    fetchWalletSummary(),
   ]);
 
   if (taskError) throw taskError;
@@ -123,9 +127,8 @@ export async function fetchProfileStats(): Promise<ProfileStats> {
   return {
     completedTasks: taskRows.length,
     completedHabits: habitRows.length,
-    totalXp:
-      taskRows.reduce((sum: number, row: any) => sum + Number(row.xp_reward ?? 0), 0) +
-      habitRows.reduce((sum: number, row: any) => sum + Number(row.xp_earned ?? 0), 0),
+    totalXp: wallet.netXp,
+    coinBalance: wallet.coinBalance,
     exerciseDays: exerciseDates.size,
     readingDays: readingDates.size,
     investmentValue: investmentRows.reduce(
