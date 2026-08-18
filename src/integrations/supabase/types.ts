@@ -585,6 +585,7 @@ export type Database = {
           available_xp: number
           coin_balance: number
           converted_xp: number
+          net_xp: number
           total_earned_xp: number
         }[]
       }
