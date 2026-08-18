@@ -11,6 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RewardsRouteImport } from './routes/rewards'
+import { Route as DemeritsRouteImport } from './routes/demerits'
+import { Route as InvestmentsRouteImport } from './routes/investments'
+import { Route as WeeklyReviewRouteImport } from './routes/weekly-review'
+import { Route as ProfileRouteImport } from './routes/profile'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +26,67 @@ const RewardsRoute = RewardsRouteImport.update({
   path: '/rewards',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DemeritsRoute = DemeritsRouteImport.update({
+  id: '/demerits',
+  path: '/demerits',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InvestmentsRoute = InvestmentsRouteImport.update({
+  id: '/investments',
+  path: '/investments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WeeklyReviewRoute = WeeklyReviewRouteImport.update({
+  id: '/weekly-review',
+  path: '/weekly-review',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/rewards': typeof RewardsRoute
+  '/demerits': typeof DemeritsRoute
+  '/investments': typeof InvestmentsRoute
+  '/weekly-review': typeof WeeklyReviewRoute
+  '/profile': typeof ProfileRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/rewards': typeof RewardsRoute
+  '/demerits': typeof DemeritsRoute
+  '/investments': typeof InvestmentsRoute
+  '/weekly-review': typeof WeeklyReviewRoute
+  '/profile': typeof ProfileRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/rewards': typeof RewardsRoute
+  '/demerits': typeof DemeritsRoute
+  '/investments': typeof InvestmentsRoute
+  '/weekly-review': typeof WeeklyReviewRoute
+  '/profile': typeof ProfileRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/rewards'
+  fullPaths: '/' | '/rewards' | '/demerits' | '/investments' | '/weekly-review' | '/profile'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/rewards'
-  id: '__root__' | '/' | '/rewards'
+  to: '/' | '/rewards' | '/demerits' | '/investments' | '/weekly-review' | '/profile'
+  id: '__root__' | '/' | '/rewards' | '/demerits' | '/investments' | '/weekly-review' | '/profile'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   RewardsRoute: typeof RewardsRoute
+  DemeritsRoute: typeof DemeritsRoute
+  InvestmentsRoute: typeof InvestmentsRoute
+  WeeklyReviewRoute: typeof WeeklyReviewRoute
+  ProfileRoute: typeof ProfileRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +105,44 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RewardsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/demerits': {
+      id: '/demerits'
+      path: '/demerits'
+      fullPath: '/demerits'
+      preLoaderRoute: typeof DemeritsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/investments': {
+      id: '/investments'
+      path: '/investments'
+      fullPath: '/investments'
+      preLoaderRoute: typeof InvestmentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/weekly-review': {
+      id: '/weekly-review'
+      path: '/weekly-review'
+      fullPath: '/weekly-review'
+      preLoaderRoute: typeof WeeklyReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   RewardsRoute: RewardsRoute,
+  DemeritsRoute: DemeritsRoute,
+  InvestmentsRoute: InvestmentsRoute,
+  WeeklyReviewRoute: WeeklyReviewRoute,
+  ProfileRoute: ProfileRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
