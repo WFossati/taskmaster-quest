@@ -8,6 +8,7 @@ import {
   Edit3,
   Flame,
   FolderPlus,
+  Frown,
   Gift,
   House,
   ListTodo,
