@@ -207,7 +207,8 @@ function TaskMaster({ userId }: { userId: string }) {
         {loadError && <div className="mb-5 rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">{loadError}</div>}
         {feedback && <div className={`mb-5 rounded-2xl px-4 py-3 text-sm font-semibold ${feedback.kind === "ok" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>{feedback.text}</div>}
 
-        <div className="mb-7 flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm sm:w-fit">
+        <div className="grid items-start gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+          <nav aria-label="Menu principal" className="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm lg:sticky lg:top-24 lg:flex-col lg:overflow-visible">
           <button onClick={() => setTab("home")} className={`flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${tab === "home" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><House className="size-4" /> Hoje</button>
           <button onClick={() => setTab("calendar")} className={`flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${tab === "calendar" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><CalendarDays className="size-4" /> Calendário</button>
           <button onClick={() => setTab("habits")} className={`flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${tab === "habits" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><Flame className="size-4" /> Hábitos</button>
@@ -218,9 +219,11 @@ function TaskMaster({ userId }: { userId: string }) {
           <Link to="/investments" className="flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"><Zap className="size-4" /> Investimentos</Link>
           <Link to="/weekly-review" className="flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"><ListTodo className="size-4" /> Dashboard</Link>
           <Link to="/library" className="flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"><BookOpen className="size-4" /> Biblioteca</Link>
-          <Link to="/profile" className="flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"><UserRound className="size-4" /> Perfil</Link>
-        </div>
+          <Link to="/ufrgs" className="flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"><Frown className="size-4" /> UFRGS</Link>
+          <Link to="/profile" className="flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"><UserRound className="size-4" /> Perfil</Link>
+          </nav>
 
+          <div className="min-w-0">
         {tab === "home" ? <HomeDashboard tasks={tasks} projects={projects} loading={loading} onNewTask={openNewTask} onOpenTasks={() => setTab("tasks")} onEditTask={editTask} onCompleteTask={(task) => void run(() => completeTaskDb(task.id), "Missão concluída!")} />
         : tab === "calendar" ? <CalendarView tasks={tasks} projects={projects} loading={loading} onNewTask={openNewTask} onEditTask={editTask} onCompleteTask={(task) => void run(() => completeTaskDb(task.id), "Missão concluída!")} />
         : tab === "habits" ? <HabitsDashboard userId={userId} />
@@ -242,6 +245,8 @@ function TaskMaster({ userId }: { userId: string }) {
             <div className="space-y-3">{loading ? <Card><div className="py-10 text-center text-sm font-semibold text-slate-500">Carregando suas missões...</div></Card> : filteredTasks.length === 0 ? <Card><div className="py-10 text-center"><ListTodo className="mx-auto mb-3 size-9 text-slate-300" /><h3 className="font-bold">Nenhuma tarefa encontrada</h3><p className="mt-1 text-sm text-slate-500">Crie uma nova missão ou ajuste os filtros.</p></div></Card> : filteredTasks.map((task) => <TaskCard key={task.id} task={task} projectLabel={projectName(task.projectId)} tagLabels={task.tagIds.map(tagName).filter(Boolean)} onEdit={() => editTask(task)} onComplete={() => void run(() => completeTaskDb(task.id), "Missão concluída!")} onReopen={() => void run(() => reopenTaskDb(task.id), "Missão reaberta.")} onDelete={() => { if (window.confirm("Excluir esta tarefa?")) void run(() => deleteTaskDb(task.id), "Missão excluída."); }} onToggleSubtask={(s) => void toggleSubtask(task.id, s)} />)}</div>
           </section>
         )}
+          </div>
+        </div>
       </div>
     </main>
   );
