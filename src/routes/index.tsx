@@ -173,7 +173,7 @@ function TaskMaster({ userId }: { userId: string }) {
     setForm(emptyForm); setSubtaskDraft(""); setEditingId(null); setTab("tasks");
   }
   function editTask(task: Task) {
-    setForm({ title: task.title, description: task.description, area: task.area, projectId: task.projectId, priority: task.priority, dueDate: task.dueDate, duration: task.duration, energy: task.energy, difficulty: task.difficulty, recurrence: task.recurrence, subtasks: task.subtasks, status: task.status, tagIds: task.tagIds, xp: task.xp });
+    setForm({ title: task.title, description: task.description, area: task.area, projectId: task.projectId, priority: task.priority, dueDate: task.dueDate, duration: task.duration, energy: task.energy, difficulty: task.difficulty, recurrence: task.recurrence, subtasks: task.subtasks, status: task.status, tagIds: task.tagIds, xp: task.xp, ...(task.study ? { study: task.study } : {}) });
     setEditingId(task.id); setTab("new"); window.scrollTo({ top: 0, behavior: "smooth" });
   }
   async function addProject() {
@@ -220,6 +220,7 @@ function TaskMaster({ userId }: { userId: string }) {
           <Link to="/weekly-review" className="flex shrink-0 items-center justify-center gap-3 rounded-xl px-4 py-2.5 lg:w-full lg:justify-start text-sm font-bold text-slate-600 transition hover:bg-slate-50"><ListTodo className="size-4 shrink-0" /> Dashboard</Link>
           <Link to="/library" className="flex shrink-0 items-center justify-center gap-3 rounded-xl px-4 py-2.5 lg:w-full lg:justify-start text-sm font-bold text-slate-600 transition hover:bg-slate-50"><BookOpen className="size-4 shrink-0" /> Biblioteca</Link>
           <Link to="/ufrgs" className="flex shrink-0 items-center justify-center gap-3 rounded-xl px-4 py-2.5 lg:w-full lg:justify-start text-sm font-bold text-slate-600 transition hover:bg-slate-50"><Frown className="size-4 shrink-0" /> UFRGS</Link>
+          <Link to="/study-hub" className="flex shrink-0 items-center justify-center gap-3 rounded-xl px-4 py-2.5 lg:w-full lg:justify-start text-sm font-bold text-slate-600 transition hover:bg-slate-50"><BookOpen className="size-4 shrink-0" /> Study Hub</Link>
           <Link to="/profile" className="flex shrink-0 items-center justify-center gap-3 rounded-xl px-4 py-2.5 lg:w-full lg:justify-start text-sm font-bold text-slate-600 transition hover:bg-slate-50"><UserRound className="size-4 shrink-0" /> Perfil</Link>
           </nav>
 

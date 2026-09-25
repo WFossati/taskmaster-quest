@@ -22,9 +22,24 @@ export type Task = {
   tagIds: string[];
   createdAt: string;
   completedAt?: string;
+  study?: { subjectId: string };
 };
 
 export type TaskInput = Omit<Task, "id" | "createdAt" | "completedAt">;
+
+const STUDY_PREFIX = "[STUDY_HUB_V1]";
+
+function decodeDescription(value: string | null): { description: string; study?: { subjectId: string } } {
+  if (!value?.startsWith(STUDY_PREFIX)) return { description: value ?? "" };
+  try {
+    const parsed: unknown = JSON.parse(value.slice(STUDY_PREFIX.length));
+    if (parsed && typeof parsed === "object" && "subjectId" in parsed && "description" in parsed &&
+      typeof parsed.subjectId === "string" && typeof parsed.description === "string") {
+      return { description: parsed.description, study: { subjectId: parsed.subjectId } };
+    }
+  } catch { /* Keep legacy or malformed descriptions visible. */ }
+  return { description: value };
+}
 
 export function calcXp(difficulty: string, priority: string) {
   const base: Record<string, number> = {
@@ -68,7 +83,7 @@ export async function fetchTasks(): Promise<Task[]> {
   return tasks.map((t) => ({
     id: t.id,
     title: t.title,
-    description: t.description ?? "",
+    ...decodeDescription(t.description),
     area: t.area,
     projectId: t.project_id ?? "",
     priority: t.priority,
@@ -106,7 +121,7 @@ function taskColumns(userId: string, input: TaskInput) {
   return {
     user_id: userId,
     title: input.title,
-    description: input.description || null,
+    description: input.study ? `${STUDY_PREFIX}${JSON.stringify({ subjectId: input.study.subjectId, description: input.description })}` : input.description || null,
     area: input.area,
     project_id: input.projectId || null,
     priority: input.priority,
