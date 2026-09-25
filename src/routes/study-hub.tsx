@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, BookOpen, CalendarDays, Check, ChevronRight, GraduationCap, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, BookOpen, CalendarDays, Check, ChevronRight, ClipboardPaste, GraduationCap, Plus, Trash2, X } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +17,36 @@ const COLORS = ["#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#10b981", "#ec4899"
 const COLUMNS = ["Planejada", "Em andamento", "Concluída"] as const;
 const EMPTY_TASK = { title: "", description: "", area: "ufrgs" as StudyArea, projectId: "", dueDate: "", priority: "Média" };
 const settingsKey = (userId: string) => `vamo-dale:study-hub:subjects:${userId}:v1`;
+type ImportDraft = { id: number; title: string; subject: string; dueDate: string; duplicate: boolean; selected: boolean };
+
+function normalize(value: string) { return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase().trim(); }
+function parseStudyList(text: string, fallbackSubject: string): ImportDraft[] {
+  let heading = "";
+  const rows: ImportDraft[] = [];
+  for (const source of text.split(/\r?\n/)) {
+    const line = source.trim();
+    if (!line) continue;
+    const section = line.match(/^#{1,6}\s+(.+)$/);
+    if (section) { heading = section[1]!.replace(/\*\*/g, "").trim(); continue; }
+    const prefixed = line.match(/^\[([^\]]+)\]\s*[-–—:]\s*(.+)$/);
+    const item = line.match(/^(?:[-*]\s*)?(?:\[[ xX]\]\s*)?(.+)$/);
+    if (!prefixed && !/^[-*]\s|^\[[ xX]\]\s/.test(line) && !fallbackSubject && !heading) continue;
+    const subject = (prefixed?.[1] || heading || fallbackSubject).trim();
+    const content = (prefixed?.[2] ?? item?.[1] ?? "").replace(/\*\*/g, "").trim();
+    if (!content || !subject) continue;
+    const date = content.match(/(?:\s*\|\s*|\s+)(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\s*$/);
+    let dueDate = "";
+    if (date) {
+      const day = Number(date[1]), month = Number(date[2]);
+      const year = Number(date[3] ?? new Date().getFullYear());
+      const fullYear = year < 100 ? 2000 + year : year;
+      const candidate = new Date(fullYear, month - 1, day);
+      if (candidate.getFullYear() === fullYear && candidate.getMonth() === month - 1 && candidate.getDate() === day) dueDate = `${fullYear}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+    rows.push({ id: rows.length, title: dueDate ? content.slice(0, date!.index).trim() : content, subject, dueDate, duplicate: false, selected: true });
+  }
+  return rows;
+}
 
 function readSettings(userId: string): SubjectSettings {
   try { return JSON.parse(localStorage.getItem(settingsKey(userId)) ?? "{}") as SubjectSettings; } catch { return {}; }
@@ -45,6 +75,11 @@ function StudyHub() {
   const [showSubjectForm, setShowSubjectForm] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [editingTask, setEditingTask] = useState<string | null>(null);
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importArea, setImportArea] = useState<StudyArea>("ufrgs");
+  const [importDrafts, setImportDrafts] = useState<ImportDraft[]>([]);
+  const [importFeedback, setImportFeedback] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -120,6 +155,53 @@ function StudyHub() {
     if (!window.confirm(`Excluir a tarefa “${task.title}”?`)) return;
     await perform(async () => { await deleteTask(task.id); await refresh(); });
   }
+  function previewImport() {
+    const fallback = subjectFilter === "all" ? "" : projects.find((project) => project.id === subjectFilter)?.name ?? "";
+    const rows = parseStudyList(importText, fallback);
+    const seen = new Set(studyTasks.map((task) => `${normalize(projects.find((project) => project.id === task.study?.subjectId)?.name ?? "")}|${normalize(task.title)}`));
+    setImportDrafts(rows.map((row) => {
+      const key = `${normalize(row.subject)}|${normalize(row.title)}`;
+      const duplicate = seen.has(key);
+      seen.add(key);
+      return { ...row, duplicate, selected: !duplicate };
+    }));
+    setImportFeedback(rows.length ? "Confira as tarefas e cadeiras antes de importar." : "Nenhuma tarefa encontrada. Use títulos com ## e itens com - [ ], ou [Cadeira] - tarefa.");
+  }
+  async function importStudies() {
+    if (!userId) return;
+    const selected = importDrafts.filter((row) => row.selected && !row.duplicate);
+    if (!selected.length) return;
+    setBusy(true); setError(""); setImportFeedback("");
+    let imported = 0;
+    const nextSettings = { ...settings };
+    try {
+      const subjectMap = new Map(projects.map((project) => [normalize(project.name), project]));
+      for (const row of selected) {
+        const key = normalize(row.subject);
+        let subject = subjectMap.get(key);
+        if (!subject) {
+          subject = await createProject(userId, row.subject);
+          subjectMap.set(key, subject);
+          setProjects((current) => [...current, subject!]);
+        }
+        if (!nextSettings[subject.id]) nextSettings[subject.id] = { area: importArea, color: COLORS[Object.keys(nextSettings).length % COLORS.length]! };
+        await createTask(userId, {
+          title: row.title, description: "", area: nextSettings[subject.id]!.area, projectId: subject.id,
+          priority: "Média", dueDate: row.dueDate, duration: "30", energy: "Média", difficulty: "Média",
+          recurrence: "Não se repete", status: "Planejada", xp: 50, subtasks: [], tagIds: [], study: { subjectId: subject.id },
+        });
+        imported += 1;
+        setImportDrafts((current) => current.map((draft) => draft.id === row.id ? { ...draft, duplicate: true, selected: false } : draft));
+      }
+      saveSettings(nextSettings);
+      await refresh();
+      setImportFeedback(`${imported} ${imported === 1 ? "tarefa importada" : "tarefas importadas"} para o tabuleiro!`);
+    } catch (err) {
+      saveSettings(nextSettings);
+      await refresh().catch(() => {});
+      setError(`${imported} tarefa(s) importada(s). ${err instanceof Error ? err.message : "Erro ao continuar a importação."}`);
+    } finally { setBusy(false); }
+  }
 
   return <main className="min-h-screen bg-[#f7f8fb] px-4 py-7 text-slate-950 sm:px-8">
     <div className="mx-auto max-w-7xl space-y-6">
@@ -143,6 +225,16 @@ function StudyHub() {
         </form>}
         <div className="mt-5 flex flex-wrap gap-2">{subjects.length ? subjects.map((subject) => <button key={subject.id} onClick={() => setSubjectFilter(subjectFilter === subject.id ? "all" : subject.id)} className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold ${subjectFilter === subject.id ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-700"}`}><span className="size-3 rounded-full" style={{ background: settings[subject.id]?.color ?? COLORS[0]! }} />{subject.name}<span className="opacity-60">{studyTasks.filter((task) => task.study?.subjectId === subject.id).length}</span></button>) : <p className="text-sm text-slate-500">Adicione sua primeira cadeira ou tema para começar.</p>}</div>
         {subjects.length > 0 && <p className="mt-4 text-xs text-slate-500">Para trocar a cor, clique no círculo ao lado da cadeira: <span className="sr-only">Cores abaixo</span>{subjects.map((subject) => <label key={subject.id} className="ml-2 inline-flex items-center gap-1">{subject.name}<input aria-label={`Cor de ${subject.name}`} type="color" value={settings[subject.id]?.color ?? COLORS[0]!} onChange={(e) => saveSettings({ ...settings, [subject.id]: { area: settings[subject.id]?.area ?? "ufrgs", color: e.target.value } })} className="size-6 cursor-pointer rounded" /></label>)}</p>}
+      </section>
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="flex items-center gap-2 text-xl font-black"><ClipboardPaste className="size-5 text-violet-600" /> Importar lista de estudos</h2><p className="text-sm text-slate-500">Cole uma lista; o Study Hub separa as tarefas por cadeira ou tema e coloca cada uma no tabuleiro.</p></div><button onClick={() => setShowImport(!showImport)} className="rounded-xl border border-violet-200 px-4 py-2.5 text-sm font-bold text-violet-700">{showImport ? "Fechar importação" : "Colar lista"}</button></div>
+        {showImport && <div className="mt-5 space-y-4">
+          <div className="rounded-xl bg-violet-50 p-4 text-sm text-slate-700"><p className="font-bold">Exemplo:</p><pre className="mt-2 whitespace-pre-wrap font-sans">## Administração Financeira II{"\n"}- [ ] Estudar CAPM | 30/09/2026{"\n"}- [ ] Resolver exercícios de CMPC{"\n"}## Inglês{"\n"}- [ ] Revisar vocabulário</pre><p className="mt-2">Também aceita <strong>[Cadeira] - tarefa</strong>, uma por linha. Sem cabeçalho, selecione uma cadeira acima para receber a lista.</p></div>
+          <label className="block text-sm font-bold">Sua lista<textarea rows={7} className="input mt-1" value={importText} onChange={(e) => { setImportText(e.target.value); setImportDrafts([]); }} placeholder="Cole as tarefas aqui..." /></label>
+          <div className="flex flex-wrap items-center gap-3"><label className="text-sm font-bold">Área das novas cadeiras<select className="ml-2 rounded-lg border p-2" value={importArea} onChange={(e) => setImportArea(e.target.value as StudyArea)}><option value="ufrgs">UFRGS</option><option value="conhecimento">Conhecimento</option></select></label><button onClick={previewImport} disabled={!importText.trim() || busy} className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40">Pré-visualizar</button></div>
+          {importFeedback && <p role="status" className="text-sm font-semibold text-violet-700">{importFeedback}</p>}
+          {importDrafts.length > 0 && <div className="space-y-2"><h3 className="font-bold">Prévia · {importDrafts.filter((row) => row.selected && !row.duplicate).length} selecionadas</h3>{importDrafts.map((row) => <label key={row.id} className="flex items-start gap-3 rounded-xl border p-3 text-sm"><input type="checkbox" disabled={row.duplicate || busy} checked={row.selected && !row.duplicate} onChange={(e) => setImportDrafts((current) => current.map((item) => item.id === row.id ? { ...item, selected: e.target.checked } : item))} className="mt-1" /><span className="flex-1"><strong>{row.subject}</strong> · {row.title}{row.dueDate && <span className="ml-2 text-slate-500">{formatDate(row.dueDate)}</span>}</span>{row.duplicate && <span className="text-xs font-bold text-amber-700">Duplicada</span>}</label>)}<button onClick={() => void importStudies()} disabled={busy || !importDrafts.some((row) => row.selected && !row.duplicate)} className="rounded-xl bg-violet-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-40">{busy ? "Importando..." : "Importar tarefas selecionadas"}</button></div>}
+        </div>}
       </section>
       <section>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-2xl font-black">Tabuleiro de estudos</h2><p className="text-sm text-slate-500">Mova as cartas entre as etapas conforme avançar.</p></div><div className="flex gap-2"><select aria-label="Filtrar área" value={areaFilter} onChange={(e) => { setAreaFilter(e.target.value as typeof areaFilter); setSubjectFilter("all"); }} className="rounded-xl border bg-white px-3 py-2 text-sm font-bold"><option value="all">Todas as áreas</option><option value="ufrgs">UFRGS</option><option value="conhecimento">Conhecimento</option></select><button onClick={() => startTask()} disabled={!subjects.length} className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-40"><Plus className="size-4" /> Nova tarefa</button></div></div>
