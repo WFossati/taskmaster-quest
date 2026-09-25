@@ -11,10 +11,13 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DemeritsRouteImport } from './routes/demerits'
+import { Route as ImportRouteImport } from './routes/import'
 import { Route as InvestmentsRouteImport } from './routes/investments'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as RewardsRouteImport } from './routes/rewards'
+import { Route as StudyHubRouteImport } from './routes/study-hub'
+import { Route as UfrgsRouteImport } from './routes/ufrgs'
 import { Route as WeeklyReviewRouteImport } from './routes/weekly-review'
 
 const IndexRoute = IndexRouteImport.update({
@@ -25,6 +28,11 @@ const IndexRoute = IndexRouteImport.update({
 const DemeritsRoute = DemeritsRouteImport.update({
   id: '/demerits',
   path: '/demerits',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImportRoute = ImportRouteImport.update({
+  id: '/import',
+  path: '/import',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InvestmentsRoute = InvestmentsRouteImport.update({
@@ -47,6 +55,16 @@ const RewardsRoute = RewardsRouteImport.update({
   path: '/rewards',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudyHubRoute = StudyHubRouteImport.update({
+  id: '/study-hub',
+  path: '/study-hub',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UfrgsRoute = UfrgsRouteImport.update({
+  id: '/ufrgs',
+  path: '/ufrgs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WeeklyReviewRoute = WeeklyReviewRouteImport.update({
   id: '/weekly-review',
   path: '/weekly-review',
@@ -56,29 +74,38 @@ const WeeklyReviewRoute = WeeklyReviewRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/demerits': typeof DemeritsRoute
+  '/import': typeof ImportRoute
   '/investments': typeof InvestmentsRoute
   '/library': typeof LibraryRoute
   '/profile': typeof ProfileRoute
   '/rewards': typeof RewardsRoute
+  '/study-hub': typeof StudyHubRoute
+  '/ufrgs': typeof UfrgsRoute
   '/weekly-review': typeof WeeklyReviewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/demerits': typeof DemeritsRoute
+  '/import': typeof ImportRoute
   '/investments': typeof InvestmentsRoute
   '/library': typeof LibraryRoute
   '/profile': typeof ProfileRoute
   '/rewards': typeof RewardsRoute
+  '/study-hub': typeof StudyHubRoute
+  '/ufrgs': typeof UfrgsRoute
   '/weekly-review': typeof WeeklyReviewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/demerits': typeof DemeritsRoute
+  '/import': typeof ImportRoute
   '/investments': typeof InvestmentsRoute
   '/library': typeof LibraryRoute
   '/profile': typeof ProfileRoute
   '/rewards': typeof RewardsRoute
+  '/study-hub': typeof StudyHubRoute
+  '/ufrgs': typeof UfrgsRoute
   '/weekly-review': typeof WeeklyReviewRoute
 }
 export interface FileRouteTypes {
@@ -86,38 +113,50 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/demerits'
+    | '/import'
     | '/investments'
     | '/library'
     | '/profile'
     | '/rewards'
+    | '/study-hub'
+    | '/ufrgs'
     | '/weekly-review'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/demerits'
+    | '/import'
     | '/investments'
     | '/library'
     | '/profile'
     | '/rewards'
+    | '/study-hub'
+    | '/ufrgs'
     | '/weekly-review'
   id:
     | '__root__'
     | '/'
     | '/demerits'
+    | '/import'
     | '/investments'
     | '/library'
     | '/profile'
     | '/rewards'
+    | '/study-hub'
+    | '/ufrgs'
     | '/weekly-review'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DemeritsRoute: typeof DemeritsRoute
+  ImportRoute: typeof ImportRoute
   InvestmentsRoute: typeof InvestmentsRoute
   LibraryRoute: typeof LibraryRoute
   ProfileRoute: typeof ProfileRoute
   RewardsRoute: typeof RewardsRoute
+  StudyHubRoute: typeof StudyHubRoute
+  UfrgsRoute: typeof UfrgsRoute
   WeeklyReviewRoute: typeof WeeklyReviewRoute
 }
 
@@ -135,6 +174,13 @@ declare module '@tanstack/react-router' {
       path: '/demerits'
       fullPath: '/demerits'
       preLoaderRoute: typeof DemeritsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/import': {
+      id: '/import'
+      path: '/import'
+      fullPath: '/import'
+      preLoaderRoute: typeof ImportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/investments': {
@@ -165,6 +211,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RewardsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/study-hub': {
+      id: '/study-hub'
+      path: '/study-hub'
+      fullPath: '/study-hub'
+      preLoaderRoute: typeof StudyHubRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ufrgs': {
+      id: '/ufrgs'
+      path: '/ufrgs'
+      fullPath: '/ufrgs'
+      preLoaderRoute: typeof UfrgsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/weekly-review': {
       id: '/weekly-review'
       path: '/weekly-review'
@@ -178,10 +238,13 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DemeritsRoute: DemeritsRoute,
+  ImportRoute: ImportRoute,
   InvestmentsRoute: InvestmentsRoute,
   LibraryRoute: LibraryRoute,
   ProfileRoute: ProfileRoute,
   RewardsRoute: RewardsRoute,
+  StudyHubRoute: StudyHubRoute,
+  UfrgsRoute: UfrgsRoute,
   WeeklyReviewRoute: WeeklyReviewRoute,
 }
 export const routeTree = rootRouteImport
