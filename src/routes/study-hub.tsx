@@ -3,7 +3,7 @@ import { ArrowLeft, BookOpen, CalendarDays, Check, ChevronRight, ClipboardPaste,
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
-import { completeTask, createProject, createTask, deleteTask, fetchProjects, fetchTasks, reopenTask, updateTask, type Project, type Task, type TaskInput } from "@/lib/taskmaster-data";
+import { completeTask, createProject, createTask, deleteProject, deleteTask, fetchProjects, fetchTasks, reopenTask, setStudyTaskXp, updateTask, type Project, type Task, type TaskInput } from "@/lib/taskmaster-data";
 
 export const Route = createFileRoute("/study-hub")({
   head: () => ({ meta: [{ title: "Study Hub — Vamo Dale!!" }, { name: "description", content: "Organize seus estudos por cadeira e acompanhe o progresso em um quadro visual." }] }),
@@ -88,7 +88,10 @@ function StudyHub() {
       if (authError || !data.user) { setError("Entre na sua conta para acessar seus estudos."); setLoading(false); return; }
       const id = data.user.id;
       setUserId(id); setSettings(readSettings(id)); setCourses(readCourses());
-      Promise.all([fetchProjects(), fetchTasks()]).then(([p, t]) => { if (mounted) { setProjects(p); setTasks(t); } }).catch((err) => { if (mounted) setError(err instanceof Error ? err.message : "Erro ao carregar estudos."); }).finally(() => { if (mounted) setLoading(false); });
+      Promise.all([fetchProjects(), fetchTasks()]).then(async ([p, t]) => {
+        await setStudyTaskXp(id, t);
+        if (mounted) { setProjects(p); setTasks(t.map((task) => task.study ? { ...task, xp: 20 } : task)); }
+      }).catch((err) => { if (mounted) setError(err instanceof Error ? err.message : "Erro ao carregar estudos."); }).finally(() => { if (mounted) setLoading(false); });
     });
     return () => { mounted = false; };
   }, []);
@@ -133,8 +136,8 @@ function StudyHub() {
     if (!userId || !taskForm.title.trim() || !taskForm.projectId) return;
     await perform(async () => {
       const original = tasks.find((task) => task.id === editingTask);
-      const payload: TaskInput = original ? { ...inputFor(original), title: taskForm.title.trim(), description: taskForm.description.trim(), area: taskForm.area, projectId: taskForm.projectId, dueDate: taskForm.dueDate, priority: taskForm.priority, study: { subjectId: taskForm.projectId } } : {
-        title: taskForm.title.trim(), description: taskForm.description.trim(), area: taskForm.area, projectId: taskForm.projectId, dueDate: taskForm.dueDate, priority: taskForm.priority, duration: "30", energy: "Média", difficulty: "Média", recurrence: "Não se repete", status: "Planejada", xp: 50, subtasks: [], tagIds: [], study: { subjectId: taskForm.projectId },
+      const payload: TaskInput = original ? { ...inputFor(original), title: taskForm.title.trim(), description: taskForm.description.trim(), area: taskForm.area, projectId: taskForm.projectId, dueDate: taskForm.dueDate, priority: taskForm.priority, xp: 20, study: { subjectId: taskForm.projectId } } : {
+        title: taskForm.title.trim(), description: taskForm.description.trim(), area: taskForm.area, projectId: taskForm.projectId, dueDate: taskForm.dueDate, priority: taskForm.priority, duration: "30", energy: "Média", difficulty: "Média", recurrence: "Não se repete", status: "Planejada", xp: 20, subtasks: [], tagIds: [], study: { subjectId: taskForm.projectId },
       };
       if (editingTask) await updateTask(userId, editingTask, payload); else await createTask(userId, payload);
       await refresh(); setShowTaskForm(false); setEditingTask(null); setTaskForm(EMPTY_TASK);
@@ -154,6 +157,19 @@ function StudyHub() {
   async function removeTask(task: Task) {
     if (!window.confirm(`Excluir a tarefa “${task.title}”?`)) return;
     await perform(async () => { await deleteTask(task.id); await refresh(); });
+  }
+  async function removeSubject(subject: Project) {
+    const related = studyTasks.filter((task) => task.study?.subjectId === subject.id);
+    if (!window.confirm(`Excluir “${subject.name}” do Study Hub e suas ${related.length} tarefa(s) de estudo? Esta ação não pode ser desfeita.`)) return;
+    await perform(async () => {
+      for (const task of related) await deleteTask(task.id);
+      const hasOtherTasks = tasks.some((task) => task.projectId === subject.id && !task.study);
+      if (!hasOtherTasks) await deleteProject(subject.id);
+      const next = { ...settings }; delete next[subject.id]; saveSettings(next);
+      setSubjectFilter("all");
+      if (!hasOtherTasks) setProjects((current) => current.filter((project) => project.id !== subject.id));
+      await refresh();
+    });
   }
   function previewImport() {
     const fallback = subjectFilter === "all" ? "" : projects.find((project) => project.id === subjectFilter)?.name ?? "";
@@ -188,7 +204,7 @@ function StudyHub() {
         await createTask(userId, {
           title: row.title, description: "", area: nextSettings[subject.id]!.area, projectId: subject.id,
           priority: "Média", dueDate: row.dueDate, duration: "30", energy: "Média", difficulty: "Média",
-          recurrence: "Não se repete", status: "Planejada", xp: 50, subtasks: [], tagIds: [], study: { subjectId: subject.id },
+          recurrence: "Não se repete", status: "Planejada", xp: 20, subtasks: [], tagIds: [], study: { subjectId: subject.id },
         });
         imported += 1;
         setImportDrafts((current) => current.map((draft) => draft.id === row.id ? { ...draft, duplicate: true, selected: false } : draft));
@@ -213,7 +229,7 @@ function StudyHub() {
       <section className="grid gap-3 sm:grid-cols-3">
         <Metric label="Na trilha" value={pending} icon={<BookOpen className="size-5" />} />
         <Metric label="Concluídas" value={done} icon={<Check className="size-5" />} />
-        <Metric label="Cadeiras e temas" value={subjects.length} icon={<GraduationCap className="size-5" />} />
+        <Metric label="Progresso geral" value={studyTasks.length ? `${Math.round(done / studyTasks.length * 100)}%` : "0%"} icon={<GraduationCap className="size-5" />} />
       </section>
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-black">Minhas cadeiras e temas</h2><p className="text-sm text-slate-500">Escolha uma cor para identificar as tarefas de cada matéria.</p></div><button onClick={() => setShowSubjectForm(!showSubjectForm)} className="flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white"><Plus className="size-4" /> Adicionar cadeira ou tema</button></div>
@@ -223,7 +239,17 @@ function StudyHub() {
           <label className="text-sm font-bold">Cor<input type="color" className="mt-1 h-10 w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-1" value={subjectForm.color} onChange={(e) => setSubjectForm({ ...subjectForm, color: e.target.value })} /></label>
           <button disabled={busy} className="rounded-xl bg-violet-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">Salvar</button>
         </form>}
-        <div className="mt-5 flex flex-wrap gap-2">{subjects.length ? subjects.map((subject) => <button key={subject.id} onClick={() => setSubjectFilter(subjectFilter === subject.id ? "all" : subject.id)} className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold ${subjectFilter === subject.id ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-700"}`}><span className="size-3 rounded-full" style={{ background: settings[subject.id]?.color ?? COLORS[0]! }} />{subject.name}<span className="opacity-60">{studyTasks.filter((task) => task.study?.subjectId === subject.id).length}</span></button>) : <p className="text-sm text-slate-500">Adicione sua primeira cadeira ou tema para começar.</p>}</div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{subjects.length ? subjects.map((subject) => {
+          const assigned = studyTasks.filter((task) => task.study?.subjectId === subject.id);
+          const completed = assigned.filter((task) => task.status === "Concluída").length;
+          const percent = assigned.length ? Math.round(completed / assigned.length * 100) : 0;
+          const color = settings[subject.id]?.color ?? COLORS[0]!;
+          return <article key={subject.id} className={`rounded-2xl border p-4 ${subjectFilter === subject.id ? "border-slate-900" : "border-slate-200"}`}>
+            <div className="flex items-start justify-between gap-2"><button onClick={() => setSubjectFilter(subjectFilter === subject.id ? "all" : subject.id)} className="flex min-w-0 items-center gap-2 text-left font-bold"><span className="size-3 shrink-0 rounded-full" style={{ background: color }} /><span className="truncate">{subject.name}</span></button><button disabled={busy} onClick={() => void removeSubject(subject)} aria-label={`Excluir cadeira ${subject.name}`} title="Excluir cadeira e suas tarefas de estudo" className="shrink-0 text-slate-400 hover:text-red-600 disabled:opacity-40"><Trash2 className="size-4" /></button></div>
+            <div className="mt-4 flex items-end justify-between text-sm"><span className="text-slate-500">{completed} de {assigned.length} temas estudados</span><strong style={{ color }}>{percent}%</strong></div>
+            <div role="progressbar" aria-label={`Progresso de ${subject.name}`} aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100} className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full transition-all" style={{ width: `${percent}%`, background: color }} /></div>
+          </article>;
+        }) : <p className="text-sm text-slate-500">Adicione sua primeira cadeira ou tema para começar.</p>}</div>
         {subjects.length > 0 && <p className="mt-4 text-xs text-slate-500">Para trocar a cor, clique no círculo ao lado da cadeira: <span className="sr-only">Cores abaixo</span>{subjects.map((subject) => <label key={subject.id} className="ml-2 inline-flex items-center gap-1">{subject.name}<input aria-label={`Cor de ${subject.name}`} type="color" value={settings[subject.id]?.color ?? COLORS[0]!} onChange={(e) => saveSettings({ ...settings, [subject.id]: { area: settings[subject.id]?.area ?? "ufrgs", color: e.target.value } })} className="size-6 cursor-pointer rounded" /></label>)}</p>}
       </section>
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -253,4 +279,4 @@ function StudyHub() {
     </div>
   </main>;
 }
-function Metric({ label, value, icon }: { label: string; value: number; icon: React.ReactNode }) { return <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><span className="grid size-11 place-items-center rounded-xl bg-violet-50 text-violet-600">{icon}</span><div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p><p className="text-2xl font-black">{value}</p></div></div>; }
+function Metric({ label, value, icon }: { label: string; value: number | string; icon: React.ReactNode }) { return <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><span className="grid size-11 place-items-center rounded-xl bg-violet-50 text-violet-600">{icon}</span><div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p><p className="text-2xl font-black">{value}</p></div></div>; }

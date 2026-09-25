@@ -110,6 +110,17 @@ export async function createProject(userId: string, name: string): Promise<Proje
   return { id: row.id, name: row.name };
 }
 
+export async function deleteProject(projectId: string) {
+  unwrap(await supabase.from("projects").delete().eq("id", projectId).select("id").single());
+}
+
+export async function setStudyTaskXp(userId: string, tasks: Task[]) {
+  const ids = tasks.filter((task) => task.study && task.xp !== 20).map((task) => task.id);
+  if (!ids.length) return;
+  const updated = unwrap(await supabase.from("tasks").update({ xp_reward: 20 }).eq("user_id", userId).in("id", ids).select("id"));
+  if (updated.length !== ids.length) throw new Error("Não foi possível padronizar o XP de todas as tarefas de estudo.");
+}
+
 export async function createTag(userId: string, name: string): Promise<TagRow> {
   const row = unwrap(
     await supabase.from("tags").insert({ user_id: userId, name }).select("id, name").single(),
@@ -131,7 +142,7 @@ function taskColumns(userId: string, input: TaskInput) {
     difficulty: input.difficulty,
     recurrence: input.recurrence,
     status: input.status,
-    xp_reward: input.xp,
+    xp_reward: input.study ? 20 : input.xp,
   };
 }
 
