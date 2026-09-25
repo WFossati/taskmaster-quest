@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, BookOpen, CalendarDays, Check, ChevronRight, ClipboardPaste, GraduationCap, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, BookOpen, CalendarDays, Check, ClipboardPaste, GraduationCap, Plus, Trash2, X } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -14,7 +14,6 @@ type StudyArea = "ufrgs" | "conhecimento";
 type SubjectSettings = Record<string, { color: string; area: StudyArea }>;
 type Course = { id: string; name: string; status: string };
 const COLORS = ["#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#10b981", "#ec4899", "#3b82f6", "#f97316"];
-const COLUMNS = ["Planejada", "Em andamento", "Concluída"] as const;
 const EMPTY_TASK = { title: "", description: "", area: "ufrgs" as StudyArea, projectId: "", dueDate: "", priority: "Média" };
 const settingsKey = (userId: string) => `vamo-dale:study-hub:subjects:${userId}:v1`;
 type ImportDraft = { id: number; title: string; subject: string; dueDate: string; duplicate: boolean; selected: boolean };
@@ -100,6 +99,12 @@ function StudyHub() {
   const subjectIds = useMemo(() => new Set([...Object.keys(settings), ...studyTasks.map((task) => task.study!.subjectId)]), [settings, studyTasks]);
   const subjects = useMemo(() => projects.filter((project) => subjectIds.has(project.id)), [projects, subjectIds]);
   const visible = studyTasks.filter((task) => (areaFilter === "all" || task.area === areaFilter) && (subjectFilter === "all" || task.study?.subjectId === subjectFilter));
+  const routeTasks = [...visible].sort((a, b) => {
+    if (!a.dueDate) return b.dueDate ? 1 : a.createdAt.localeCompare(b.createdAt);
+    if (!b.dueDate) return -1;
+    return a.dueDate.localeCompare(b.dueDate) || a.createdAt.localeCompare(b.createdAt);
+  });
+  const nextStop = routeTasks.findIndex((task) => task.status !== "Concluída");
   const pending = studyTasks.filter((task) => task.status !== "Concluída").length;
   const done = studyTasks.length - pending;
   const courseChoices = courses.filter((course) => course.status === "Em andamento" && !subjects.some((subject) => subject.name.toLocaleLowerCase() === course.name.toLocaleLowerCase()));
@@ -143,14 +148,11 @@ function StudyHub() {
       await refresh(); setShowTaskForm(false); setEditingTask(null); setTaskForm(EMPTY_TASK);
     });
   }
-  async function moveTask(task: Task, status: string) {
-    if (!userId || task.status === status) return;
+  async function toggleTask(task: Task) {
+    if (!userId) return;
     await perform(async () => {
-      if (status === "Concluída") await completeTask(task.id);
-      else if (task.status === "Concluída") {
-        await reopenTask(task.id);
-        if (status !== "Em andamento") await updateTask(userId, task.id, { ...inputFor(task), status });
-      } else await updateTask(userId, task.id, { ...inputFor(task), status });
+      if (task.status === "Concluída") await reopenTask(task.id);
+      else await completeTask(task.id);
       await refresh();
     });
   }
@@ -263,20 +265,55 @@ function StudyHub() {
         </div>}
       </section>
       <section>
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-2xl font-black">Tabuleiro de estudos</h2><p className="text-sm text-slate-500">Mova as cartas entre as etapas conforme avançar.</p></div><div className="flex gap-2"><select aria-label="Filtrar área" value={areaFilter} onChange={(e) => { setAreaFilter(e.target.value as typeof areaFilter); setSubjectFilter("all"); }} className="rounded-xl border bg-white px-3 py-2 text-sm font-bold"><option value="all">Todas as áreas</option><option value="ufrgs">UFRGS</option><option value="conhecimento">Conhecimento</option></select><button onClick={() => startTask()} disabled={!subjects.length} className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-40"><Plus className="size-4" /> Nova tarefa</button></div></div>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-2xl font-black">Trilha de estudos</h2><p className="text-sm text-slate-500">Siga as casas por data, marque o que estudou e veja sua bola avançar.</p></div><div className="flex gap-2"><select aria-label="Filtrar área" value={areaFilter} onChange={(e) => { setAreaFilter(e.target.value as typeof areaFilter); setSubjectFilter("all"); }} className="rounded-xl border bg-white px-3 py-2 text-sm font-bold"><option value="all">Todas as áreas</option><option value="ufrgs">UFRGS</option><option value="conhecimento">Conhecimento</option></select><button onClick={() => startTask()} disabled={!subjects.length} className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-40"><Plus className="size-4" /> Nova tarefa</button></div></div>
         {showTaskForm && <form onSubmit={saveTask} className="mb-5 grid gap-3 rounded-2xl border border-violet-100 bg-white p-5 shadow-sm sm:grid-cols-2 lg:grid-cols-3">
           <div className="sm:col-span-2 lg:col-span-3 flex items-center justify-between"><h3 className="font-black">{editingTask ? "Editar estudo" : "Novo estudo"}</h3><button type="button" aria-label="Fechar" onClick={() => setShowTaskForm(false)}><X className="size-4" /></button></div>
           <label className="text-sm font-bold">O que estudar? *<input required maxLength={160} className="input mt-1" value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} placeholder="Ex.: Resolver lista de exercícios 1" /></label>
           <label className="text-sm font-bold">Cadeira ou tema *<select required className="input mt-1" value={taskForm.projectId} onChange={(e) => { const projectId = e.target.value; setTaskForm({ ...taskForm, projectId, area: settings[projectId]?.area ?? "ufrgs" }); }}><option value="">Selecione</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
           <label className="text-sm font-bold">Área<select className="input mt-1" value={taskForm.area} onChange={(e) => setTaskForm({ ...taskForm, area: e.target.value as StudyArea })}><option value="ufrgs">UFRGS</option><option value="conhecimento">Conhecimento</option></select></label>
-          <label className="text-sm font-bold">Prazo<input type="date" className="input mt-1" value={taskForm.dueDate} onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })} /></label>
+          <label className="text-sm font-bold">Dia de estudo<input type="date" className="input mt-1" value={taskForm.dueDate} onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })} /></label>
           <label className="text-sm font-bold">Prioridade<select className="input mt-1" value={taskForm.priority} onChange={(e) => setTaskForm({ ...taskForm, priority: e.target.value })}>{["Baixa", "Média", "Alta", "Urgente"].map((priority) => <option key={priority}>{priority}</option>)}</select></label>
           <label className="text-sm font-bold sm:col-span-2 lg:col-span-3">Anotações<textarea rows={2} className="input mt-1" value={taskForm.description} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} placeholder="Capítulos, materiais ou objetivo da sessão" /></label>
           <button disabled={busy} className="rounded-xl bg-violet-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">{busy ? "Salvando..." : editingTask ? "Salvar alterações" : "Criar tarefa"}</button>
         </form>}
-        {loading ? <p className="py-10 text-center text-slate-500">Carregando estudos...</p> : <div className="grid gap-4 lg:grid-cols-3">{COLUMNS.map((column, index) => <div key={column} className="min-h-64 rounded-3xl border border-slate-200 bg-slate-100/70 p-4"><div className="mb-4 flex items-center justify-between"><h3 className="font-black">{index === 0 ? "🗺️" : index === 1 ? "⚔️" : "🏆"} {column}</h3><span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold">{visible.filter((task) => column === "Planejada" ? !["Em andamento", "Concluída"].includes(task.status) : task.status === column).length}</span></div><div className="space-y-3">{visible.filter((task) => column === "Planejada" ? !["Em andamento", "Concluída"].includes(task.status) : task.status === column).map((task) => { const subject = projects.find((project) => project.id === task.study?.subjectId); const color = settings[task.study?.subjectId ?? ""]?.color ?? COLORS[0]!; return <article key={task.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="h-1.5" style={{ background: color }} /><div className="p-4"><div className="flex items-start justify-between gap-2"><span className="rounded-full px-2.5 py-1 text-xs font-bold" style={{ color, background: `${color}1a` }}>{subject?.name ?? "Cadeira removida"}</span><span className="text-xs text-slate-400">{task.area === "ufrgs" ? "UFRGS" : "Conhecimento"}</span></div><h4 className="mt-3 font-bold leading-snug">{task.title}</h4>{task.description && <p className="mt-1 line-clamp-2 text-sm text-slate-500">{task.description}</p>}<div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">{task.dueDate && <span className="flex items-center gap-1"><CalendarDays className="size-3.5" />{formatDate(task.dueDate)}</span>}<span>{task.priority}</span><span>{task.xp} XP</span></div><div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-3"><button disabled={busy} onClick={() => startTask(task)} className="text-xs font-bold text-violet-700">Editar</button><button disabled={busy} onClick={() => void removeTask(task)} aria-label={`Excluir ${task.title}`} className="text-red-500"><Trash2 className="size-4" /></button><span className="flex-1" />{index > 0 && <button disabled={busy} onClick={() => void moveTask(task, COLUMNS[index - 1]!)} className="rounded-lg border px-2 py-1 text-xs font-bold">Voltar</button>}{index < 2 && <button disabled={busy} onClick={() => void moveTask(task, COLUMNS[index + 1]!)} className="flex items-center gap-1 rounded-lg bg-slate-950 px-2 py-1 text-xs font-bold text-white">{index === 1 ? "Concluir" : "Começar"}<ChevronRight className="size-3" /></button>}</div></div></article>; })}{!visible.some((task) => column === "Planejada" ? !["Em andamento", "Concluída"].includes(task.status) : task.status === column) && <p className="rounded-xl border border-dashed border-slate-300 px-3 py-8 text-center text-sm text-slate-400">Nenhuma carta nesta etapa</p>}</div></div>)}</div>}
+        {loading ? <p className="py-10 text-center text-slate-500">Carregando estudos...</p> :
+          <div className="overflow-hidden rounded-[2rem] border border-violet-100 bg-gradient-to-b from-violet-100 via-indigo-50 to-amber-50 p-4 shadow-sm sm:p-7">
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/80 bg-white/75 p-4">
+              <div className="flex items-center gap-3"><Basketball size={54} /><div><p className="text-xs font-black uppercase tracking-wider text-violet-700">Sua jornada</p><p className="font-bold">{routeTasks.length === 0 ? "Sua primeira casa está esperando!" : nextStop < 0 ? "Cesta! Você completou esta trilha 🏆" : `Próxima casa: ${nextStop + 1} de ${routeTasks.length}`}</p><p className="text-xs text-slate-500">Cada estudo concluído vale 20 XP.</p></div></div>
+              <span className="rounded-full bg-violet-100 px-4 py-2 text-sm font-black text-violet-800">{routeTasks.filter((task) => task.status === "Concluída").length}/{routeTasks.length} casas</span>
+            </div>
+            {routeTasks.length === 0 ? <div className="grid min-h-40 place-items-center text-center text-sm font-semibold text-slate-500">Adicione ou importe tarefas para montar a trilha.</div> :
+              <div className="relative mx-auto mt-8 max-w-4xl pb-4">
+                <div aria-hidden="true" className="absolute bottom-8 left-7 top-8 w-1 rounded-full border-l-4 border-dashed border-violet-300 sm:left-1/2 sm:-translate-x-1/2" />
+                <ol className="relative space-y-6">{routeTasks.map((task, index) => {
+                  const subject = projects.find((project) => project.id === task.study?.subjectId);
+                  const color = settings[task.study?.subjectId ?? ""]?.color ?? COLORS[0]!;
+                  const completed = task.status === "Concluída";
+                  const current = index === nextStop;
+                  return <li key={task.id} className={`relative flex items-start gap-4 sm:w-[calc(50%+1.5rem)] ${index % 2 ? "sm:ml-auto sm:flex-row" : "sm:flex-row-reverse"}`}>
+                    <div className={`relative z-10 grid size-14 shrink-0 place-items-center rounded-full border-4 shadow-md ${current ? "border-amber-300 bg-amber-100" : completed ? "border-emerald-300 bg-emerald-50" : "border-white bg-violet-100"}`}>
+                      {current ? <Basketball size={43} /> : completed ? <Check className="size-7 text-emerald-600" strokeWidth={3} /> : <span className="text-lg font-black text-violet-600">{index + 1}</span>}
+                    </div>
+                    <article className={`min-w-0 flex-1 overflow-hidden rounded-2xl border bg-white shadow-md transition-shadow hover:shadow-lg ${current ? "border-amber-300 ring-2 ring-amber-200" : completed ? "border-emerald-200" : "border-slate-200"}`}>
+                      <div className="h-2" style={{ background: color }} />
+                      <div className="space-y-3 p-4">
+                        <div className="flex flex-wrap items-center gap-2"><span className="rounded-full px-2.5 py-1 text-xs font-bold" style={{ color, background: `${color}20` }}>{subject?.name ?? "Cadeira removida"}</span>{current && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-800">🏀 SUA VEZ</span>}{completed && <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-800">FEITO</span>}</div>
+                        <h3 className={`font-bold leading-snug ${completed ? "text-slate-500 line-through" : "text-slate-900"}`}>{task.title}</h3>
+                        {task.description && <p className="line-clamp-2 text-sm text-slate-500">{task.description}</p>}
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">{task.dueDate ? <span className="flex items-center gap-1"><CalendarDays className="size-3.5" />{formatDate(task.dueDate)}</span> : <span>Sem data · ao final da trilha</span>}<span>·</span><span>{task.priority}</span><span className="font-black text-violet-600">+20 XP</span></div>
+                        <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3"><button disabled={busy} onClick={() => void toggleTask(task)} aria-label={completed ? `Desmarcar ${task.title}` : `Concluir ${task.title}`} aria-pressed={completed} className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-black disabled:opacity-50 ${completed ? "border border-slate-200 bg-white text-slate-600" : "bg-violet-600 text-white hover:bg-violet-700"}`}><span className={`grid size-4 place-items-center rounded border ${completed ? "border-emerald-500 bg-emerald-500 text-white" : "border-white"}`}>{completed && <Check className="size-3" />}</span>{completed ? "Estudado · desfazer" : "Estudei!"}</button><span className="flex-1" /><button disabled={busy} onClick={() => startTask(task)} className="text-xs font-bold text-violet-700">Editar</button><button disabled={busy} onClick={() => void removeTask(task)} aria-label={`Excluir ${task.title}`} className="text-red-500"><Trash2 className="size-4" /></button></div>
+                      </div>
+                    </article>
+                  </li>;
+                })}</ol>
+                <div className="relative z-10 mx-auto mt-6 w-fit rounded-2xl bg-amber-400 px-5 py-3 text-center text-sm font-black text-slate-950 shadow-md">🏆 CHEGADA</div>
+              </div>}
+          </div>}
+
       </section>
     </div>
   </main>;
 }
 function Metric({ label, value, icon }: { label: string; value: number | string; icon: React.ReactNode }) { return <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><span className="grid size-11 place-items-center rounded-xl bg-violet-50 text-violet-600">{icon}</span><div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p><p className="text-2xl font-black">{value}</p></div></div>; }
+
+function Basketball({ size = 48 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 64 64" role="img" aria-label="Bola de basquete, sua personagem" className="shrink-0 drop-shadow-sm"><circle cx="32" cy="32" r="29" fill="#f97316" stroke="#7c2d12" strokeWidth="3" /><path d="M32 3v58M3 32h58M10 14c18 8 18 28 0 36M54 14c-18 8-18 28 0 36" fill="none" stroke="#7c2d12" strokeWidth="2.4" /><ellipse cx="23" cy="27" rx="2" ry="2.8" fill="#2d170e" /><ellipse cx="41" cy="27" rx="2" ry="2.8" fill="#2d170e" /><path d="M25 39q7 8 14 0" fill="none" stroke="#2d170e" strokeWidth="2.5" strokeLinecap="round" /></svg>; }
