@@ -68,6 +68,7 @@ function isSameDay(a: Date, b: Date) {
 }
 
 function taskXp(task: Task) {
+  if (task.status === "Concluída") return task.xp + task.xpBonus;
   return task.xp || calcXp(task.difficulty, task.priority);
 }
 

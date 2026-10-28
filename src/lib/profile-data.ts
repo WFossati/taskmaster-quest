@@ -64,7 +64,7 @@ function calculateXpWithoutDemerits(taskRows: any[], habitRows: any[], demeritRo
 
   const taskXp = taskRows.reduce((sum, row) => {
     const completedAt = row.completed_at ? new Date(row.completed_at).getTime() : 0;
-    return completedAt > lastDemerit ? sum + Number(row.xp_reward ?? 0) : sum;
+    return completedAt > lastDemerit ? sum + Number(row.xp_reward ?? 0) + Number(row.xp_bonus ?? 0) : sum;
   }, 0);
 
   const habitXp = habitRows.reduce((sum, row) => {
@@ -85,7 +85,7 @@ export async function fetchProfileStats(): Promise<ProfileStats> {
     weeklyEvolution,
     wallet,
   ] = await Promise.all([
-    db.from("tasks").select("xp_reward,status,completed_at").eq("status", "Concluída"),
+    db.from("tasks").select("xp_reward,xp_bonus,status,completed_at").eq("status", "Concluída"),
     db.from("habit_completions").select("completed_on,xp_earned,habits(name)"),
     db.from("demerit_occurrences").select("occurred_on"),
     db.from("investments").select("invested_value,earnings"),
