@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+  Archive,
+  ArchiveRestore,
   BookOpen,
   CalendarDays,
   Check,
@@ -28,8 +30,12 @@ import { AuthScreen } from "@/components/AuthScreen";
 import { CalendarView } from "@/components/CalendarView";
 import { HabitsDashboard } from "@/components/HabitsDashboard";
 import { HomeDashboard } from "@/components/HomeDashboard";
+import { burstConfetti, LevelBar, playCompletionSound, readSoundOn, RewardToast, writeSoundOn, type RewardBurst } from "@/components/Celebration";
 import { supabase } from "@/integrations/supabase/client";
+import { countCompletedToday, levelFromXp } from "@/lib/gamification";
+import { fetchWalletSummary } from "@/lib/rewards-data";
 import {
+  bringBackFromSomeday,
   calcXp,
   completeTask as completeTaskDb,
   createProject as createProjectDb,
@@ -39,6 +45,7 @@ import {
   fetchProjects,
   fetchTags,
   fetchTasks,
+  moveTasksToSomeday,
   reopenTask as reopenTaskDb,
   setSubtaskCompleted,
   updateTask as updateTaskDb,
@@ -46,6 +53,7 @@ import {
   type Subtask,
   type TagRow,
   type Task,
+  type CompletionResult,
   type TaskInput,
 } from "@/lib/taskmaster-data";
 
@@ -99,8 +107,11 @@ function TaskMasterPage() {
 }
 
 function TaskMaster({ userId }: { userId: string }) {
-  const [tab, setTab] = useState<"home" | "calendar" | "habits" | "new" | "tasks">("home");
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tab, setTab] = useState<"home" | "calendar" | "habits" | "new" | "tasks" | "someday">("home");
+  const [allTasks, setAllTasks] = useState<Task[]>([]);
+  const [netXp, setNetXp] = useState(0);
+  const [soundOn, setSoundOn] = useState(true);
+  const [burst, setBurst] = useState<RewardBurst | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [tags, setTags] = useState<TagRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,15 +137,24 @@ function TaskMaster({ userId }: { userId: string }) {
   const reload = useCallback(async () => {
     setLoadError(null);
     try {
-      const [p, t, ts] = await Promise.all([fetchProjects(), fetchTags(), fetchTasks()]);
-      setProjects(p); setTags(t); setTasks(ts);
+      const [p, t, ts, wallet] = await Promise.all([fetchProjects(), fetchTags(), fetchTasks(), fetchWalletSummary().catch(() => null)]);
+      setProjects(p); setTags(t); setAllTasks(ts);
+      if (wallet) setNetXp(wallet.netXp);
     } catch (err) { setLoadError(err instanceof Error ? err.message : "Erro ao carregar dados."); }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => { setLoading(true); void reload(); }, [reload, userId]);
+  useEffect(() => { setSoundOn(readSoundOn()); }, []);
   const xpPreview = useMemo(() => calcXp(form.difficulty, form.priority), [form.difficulty, form.priority]);
-  const completedXp = useMemo(() => tasks.filter((t) => t.status === "Concluída").reduce((sum, t) => sum + (t.xp || calcXp(t.difficulty, t.priority)), 0), [tasks]);
+  // Missões na gaveta "Algum dia" ficam fora de Hoje, Calendário e Minhas tarefas.
+  const tasks = useMemo(() => allTasks.filter((t) => !t.somedayAt), [allTasks]);
+  const somedayTasks = useMemo(() => allTasks.filter((t) => t.somedayAt && t.status !== "Concluída").sort((a, b) => (a.dueDate || "9999").localeCompare(b.dueDate || "9999")), [allTasks]);
+  const overdueIds = useMemo(() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return tasks.filter((t) => t.status !== "Concluída" && t.dueDate && new Date(`${t.dueDate}T00:00:00`) < today).map((t) => t.id);
+  }, [tasks]);
+  const comboToday = useMemo(() => countCompletedToday(tasks), [tasks]);
 
   const filteredTasks = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -159,21 +179,49 @@ function TaskMaster({ userId }: { userId: string }) {
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) { setForm((current) => ({ ...current, [key]: value })); }
   function openNewTask() { setEditingId(null); setForm(emptyForm); setSubtaskDraft(""); setTab("new"); window.scrollTo({ top: 0, behavior: "smooth" }); }
-  async function run(action: () => Promise<void>, okText: string) {
+  /** Executa a ação, recarrega e devolve true se deu certo. */
+  async function run(action: () => Promise<void>, okText: string | null) {
     setSaving(true); setFeedback(null);
-    try { await action(); await reload(); setFeedback({ kind: "ok", text: okText }); }
-    catch (err) { setFeedback({ kind: "error", text: err instanceof Error ? err.message : "Algo deu errado." }); }
+    try { await action(); await reload(); if (okText) setFeedback({ kind: "ok", text: okText }); return true; }
+    catch (err) { setFeedback({ kind: "error", text: err instanceof Error ? err.message : "Algo deu errado." }); return false; }
     finally { setSaving(false); }
+  }
+  /** xpBefore: XP líquido antes da conclusão (o reload já trouxe o novo saldo do banco). */
+  function celebrate(result: CompletionResult, xpBefore: number) {
+    const before = levelFromXp(xpBefore).level;
+    const after = levelFromXp(xpBefore + result.baseXp + result.bonusXp).level;
+    const levelUp = after > before ? after : null;
+    setBurst({ id: Date.now(), ...result, levelUp });
+    burstConfetti(levelUp ? 2 : result.combo >= 3 ? 1.5 : result.combo === 2 ? 1.2 : 1);
+    if (soundOn) playCompletionSound(result.combo, Boolean(levelUp));
+  }
+  function completeTask(task: Task) {
+    const xpBefore = netXp;
+    const box: { result: CompletionResult | null } = { result: null };
+    void run(async () => { box.result = await completeTaskDb(task.id); }, null).then((ok) => { if (ok && box.result) celebrate(box.result, xpBefore); });
+  }
+  const clearBurst = useCallback(() => setBurst(null), []);
+  function toggleSound() { setSoundOn((on) => { writeSoundOn(!on); return !on; }); }
+  function sendOverdueToSomeday() {
+    if (!overdueIds.length) return;
+    if (!window.confirm(`Guardar ${overdueIds.length} missões atrasadas na gaveta "Algum dia"? Nada é apagado: você puxa de volta só o que ainda importa.`)) return;
+    const box = { moved: 0 };
+    void run(async () => { box.moved = await moveTasksToSomeday(overdueIds); }, null).then((ok) => { if (ok) setFeedback({ kind: "ok", text: `${box.moved} missões guardadas em "Algum dia". Recomeço sem culpa! ✨` }); });
   }
   async function saveTask(event: FormEvent) {
     event.preventDefault(); if (!form.title.trim() || saving) return;
     const payload: TaskInput = { ...form, title: form.title.trim(), description: form.description.trim() };
     const wasEditing = editingId;
-    await run(async () => { if (wasEditing) await updateTaskDb(userId, wasEditing, payload); else await createTaskDb(userId, payload); }, wasEditing ? "Missão atualizada!" : "Missão criada!");
+    const xpBefore = netXp;
+    const box: { completion: CompletionResult | null } = { completion: null };
+    const ok = await run(async () => { if (wasEditing) box.completion = await updateTaskDb(userId, wasEditing, payload); else await createTaskDb(userId, payload); }, wasEditing ? "Missão atualizada!" : "Missão criada!");
+    // Se der erro, o formulário continua preenchido para tentar de novo.
+    if (!ok) return;
+    if (box.completion) celebrate(box.completion, xpBefore);
     setForm(emptyForm); setSubtaskDraft(""); setEditingId(null); setTab("tasks");
   }
   function editTask(task: Task) {
-    setForm({ title: task.title, description: task.description, area: task.area, projectId: task.projectId, priority: task.priority, dueDate: task.dueDate, duration: task.duration, energy: task.energy, difficulty: task.difficulty, recurrence: task.recurrence, subtasks: task.subtasks, status: task.status, tagIds: task.tagIds, xp: task.xp, ...(task.study ? { study: task.study } : {}) });
+    setForm({ title: task.title, description: task.description, area: task.area, projectId: task.projectId, priority: task.priority, dueDate: task.dueDate, duration: task.duration, energy: task.energy, difficulty: task.difficulty, recurrence: task.recurrence, subtasks: task.subtasks, status: task.status, tagIds: task.tagIds, xp: task.xp });
     setEditingId(task.id); setTab("new"); window.scrollTo({ top: 0, behavior: "smooth" });
   }
   async function addProject() {
@@ -190,22 +238,28 @@ function TaskMaster({ userId }: { userId: string }) {
   }
   function addSubtask() { const clean = subtaskDraft.trim(); if (!clean) return; set("subtasks", [...form.subtasks, { id: crypto.randomUUID(), title: clean, isCompleted: false }]); setSubtaskDraft(""); }
   async function toggleSubtask(taskId: string, subtask: Subtask) {
-    setTasks((current) => current.map((t) => t.id === taskId ? { ...t, subtasks: t.subtasks.map((s) => s.id === subtask.id ? { ...s, isCompleted: !s.isCompleted } : s) } : t));
+    setAllTasks((current) => current.map((t) => t.id === taskId ? { ...t, subtasks: t.subtasks.map((s) => s.id === subtask.id ? { ...s, isCompleted: !s.isCompleted } : s) } : t));
     try { await setSubtaskCompleted(subtask.id, !subtask.isCompleted); } catch { await reload(); }
   }
 
   return (
     <main className="min-h-screen bg-[#f7f8fb] text-slate-950">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5 sm:py-4 lg:px-8">
           <div className="flex items-center gap-3"><div className="grid size-10 place-items-center rounded-2xl bg-slate-950 text-white"><Sparkles className="size-5" /></div><div><p className="text-sm font-medium text-slate-500">Vamo Dale!!</p><h1 className="font-bold">Sistema pessoal de missões</h1></div></div>
-          <div className="flex items-center gap-2"><div className="hidden gap-2 sm:flex"><Pill>{tasks.length} tarefas</Pill><Pill>⚡ {completedXp} XP conquistados</Pill></div><IconButton label="Sair" onClick={() => void supabase.auth.signOut()}><LogOut className="size-4" /></IconButton></div>
+          <div className="flex items-center gap-2"><LevelBar totalXp={netXp} combo={comboToday} soundOn={soundOn} onToggleSound={toggleSound} /><IconButton label="Sair" onClick={() => void supabase.auth.signOut()}><LogOut className="size-4" /></IconButton></div>
         </div>
       </header>
 
       <div className="mx-auto max-w-7xl px-5 py-7 lg:px-8">
         {loadError && <div className="mb-5 rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">{loadError}</div>}
         {feedback && <div className={`mb-5 rounded-2xl px-4 py-3 text-sm font-semibold ${feedback.kind === "ok" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>{feedback.text}</div>}
+        {!loading && overdueIds.length > 0 && (tab === "home" || tab === "tasks" || tab === "calendar") && (
+          <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm font-semibold text-amber-800"><Archive className="mr-1.5 inline size-4" />Você tem {overdueIds.length} missões atrasadas. Que tal recomeçar sem culpa?</p>
+            <button onClick={sendOverdueToSomeday} disabled={saving} className="shrink-0 rounded-xl bg-amber-500 px-4 py-2 text-sm font-bold text-white hover:bg-amber-600 disabled:opacity-60">Guardar em "Algum dia"</button>
+          </div>
+        )}
 
         <div className="grid items-start gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
           <nav aria-label="Menu principal" className="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm lg:sticky lg:top-24 lg:max-h-[calc(100dvh-7rem)] lg:flex-col lg:overflow-x-hidden lg:overflow-y-auto">
@@ -214,19 +268,19 @@ function TaskMaster({ userId }: { userId: string }) {
           <button onClick={() => setTab("habits")} className={`flex shrink-0 items-center justify-center gap-3 rounded-xl px-4 py-2.5 lg:w-full lg:justify-start text-sm font-bold transition ${tab === "habits" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><Flame className="size-4 shrink-0" /> Hábitos</button>
           <button onClick={openNewTask} className={`flex shrink-0 items-center justify-center gap-3 rounded-xl px-4 py-2.5 lg:w-full lg:justify-start text-sm font-bold transition ${tab === "new" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><Plus className="size-4 shrink-0" /> Nova missão</button>
           <button onClick={() => setTab("tasks")} className={`flex shrink-0 items-center justify-center gap-3 rounded-xl px-4 py-2.5 lg:w-full lg:justify-start text-sm font-bold transition ${tab === "tasks" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><ListTodo className="size-4 shrink-0" /> Minhas tarefas</button>
+          <button onClick={() => setTab("someday")} className={`flex shrink-0 items-center justify-center gap-3 rounded-xl px-4 py-2.5 lg:w-full lg:justify-start text-sm font-bold transition ${tab === "someday" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><Archive className="size-4 shrink-0" /> Algum dia{somedayTasks.length > 0 && <span className={`ml-auto rounded-full px-2 py-0.5 text-xs ${tab === "someday" ? "bg-white/20" : "bg-slate-100 text-slate-500"}`}>{somedayTasks.length}</span>}</button>
           <Link to="/import" className="flex shrink-0 items-center justify-center gap-3 rounded-xl px-4 py-2.5 lg:w-full lg:justify-start text-sm font-bold text-slate-600 transition hover:bg-slate-50"><ListTodo className="size-4 shrink-0" /> Importar missões</Link><Link to="/rewards" className="flex shrink-0 items-center justify-center gap-3 rounded-xl px-4 py-2.5 lg:w-full lg:justify-start text-sm font-bold text-slate-600 transition hover:bg-slate-50"><Gift className="size-4 shrink-0" /> Recompensas</Link>
           <Link to="/demerits" className="flex shrink-0 items-center justify-center gap-3 rounded-xl px-4 py-2.5 lg:w-full lg:justify-start text-sm font-bold text-slate-600 transition hover:bg-slate-50"><X className="size-4 shrink-0" /> Deméritos</Link>
           <Link to="/investments" className="flex shrink-0 items-center justify-center gap-3 rounded-xl px-4 py-2.5 lg:w-full lg:justify-start text-sm font-bold text-slate-600 transition hover:bg-slate-50"><Zap className="size-4 shrink-0" /> Investimentos</Link>
           <Link to="/weekly-review" className="flex shrink-0 items-center justify-center gap-3 rounded-xl px-4 py-2.5 lg:w-full lg:justify-start text-sm font-bold text-slate-600 transition hover:bg-slate-50"><ListTodo className="size-4 shrink-0" /> Dashboard</Link>
           <Link to="/library" className="flex shrink-0 items-center justify-center gap-3 rounded-xl px-4 py-2.5 lg:w-full lg:justify-start text-sm font-bold text-slate-600 transition hover:bg-slate-50"><BookOpen className="size-4 shrink-0" /> Biblioteca</Link>
           <Link to="/ufrgs" className="flex shrink-0 items-center justify-center gap-3 rounded-xl px-4 py-2.5 lg:w-full lg:justify-start text-sm font-bold text-slate-600 transition hover:bg-slate-50"><Frown className="size-4 shrink-0" /> UFRGS</Link>
-          <Link to="/study-hub" className="flex shrink-0 items-center justify-center gap-3 rounded-xl px-4 py-2.5 lg:w-full lg:justify-start text-sm font-bold text-slate-600 transition hover:bg-slate-50"><BookOpen className="size-4 shrink-0" /> Study Hub</Link>
           <Link to="/profile" className="flex shrink-0 items-center justify-center gap-3 rounded-xl px-4 py-2.5 lg:w-full lg:justify-start text-sm font-bold text-slate-600 transition hover:bg-slate-50"><UserRound className="size-4 shrink-0" /> Perfil</Link>
           </nav>
 
           <div className="min-w-0">
-        {tab === "home" ? <HomeDashboard tasks={tasks} projects={projects} loading={loading} onNewTask={openNewTask} onOpenTasks={() => setTab("tasks")} onEditTask={editTask} onCompleteTask={(task) => void run(() => completeTaskDb(task.id), "Missão concluída!")} />
-        : tab === "calendar" ? <CalendarView tasks={tasks} projects={projects} loading={loading} onNewTask={openNewTask} onEditTask={editTask} onCompleteTask={(task) => void run(() => completeTaskDb(task.id), "Missão concluída!")} />
+        {tab === "home" ? <HomeDashboard tasks={tasks} projects={projects} loading={loading} onNewTask={openNewTask} onOpenTasks={() => setTab("tasks")} onEditTask={editTask} onCompleteTask={completeTask} />
+        : tab === "calendar" ? <CalendarView tasks={tasks} projects={projects} loading={loading} onNewTask={openNewTask} onEditTask={editTask} onCompleteTask={completeTask} />
         : tab === "habits" ? <HabitsDashboard userId={userId} />
         : tab === "new" ? (
           <form onSubmit={saveTask} className="grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -239,16 +293,19 @@ function TaskMaster({ userId }: { userId: string }) {
             </section>
             <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start"><Card><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Prévia da missão</p><h3 className="mt-3 text-lg font-bold">{form.title || "Sua nova missão"}</h3><div className="mt-4 space-y-3 text-sm"><Meta label="Área" value={AREAS.find((a) => a.id === form.area)?.name ?? "—"} /><Meta label="Projeto" value={projectName(form.projectId) || "Sem projeto"} /><Meta label="Prioridade" value={form.priority} /><Meta label="Dificuldade" value={form.difficulty} /><Meta label="Energia" value={form.energy} /><Meta label="Duração" value={`${form.duration || 0} min`} /><Meta label="XP da missão" value={`${form.xp} XP`} /></div></Card><button type="submit" disabled={saving} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-4 font-bold text-white shadow-lg shadow-slate-200 hover:bg-slate-800 disabled:opacity-60"><Check className="size-5" />{saving ? "Salvando..." : editingId ? "Salvar alterações" : "Criar missão"}</button>{editingId && <button type="button" onClick={() => { setEditingId(null); setForm(emptyForm); }} className="w-full rounded-2xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-600">Cancelar edição</button>}</aside>
           </form>
+        ) : tab === "someday" ? (
+          <SomedayDrawer tasks={somedayTasks} projectName={projectName} saving={saving} onBringBack={(task) => void run(() => bringBackFromSomeday(task.id), `"${task.title}" voltou para hoje!`)} onEdit={editTask} />
         ) : (
           <section className="space-y-5">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="text-sm font-bold text-violet-600">MINHAS TAREFAS</p><h2 className="text-3xl font-bold tracking-tight">Tudo que está no seu radar</h2><p className="mt-1 text-sm text-slate-500">Edite, conclua e organize suas missões sem sair daqui.</p></div><button onClick={openNewTask} className="flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white"><Plus className="size-4" /> Nova tarefa</button></div>
             <Card><div className="grid gap-3 lg:grid-cols-[1fr_170px_170px_170px]"><div className="relative"><Search className="absolute left-3 top-3 size-4 text-slate-400" /><input value={search} onChange={(e) => setSearch(e.target.value)} className="input pl-10" placeholder="Buscar tarefa, projeto ou tag..." /></div><select value={filterArea} onChange={(e) => setFilterArea(e.target.value)} className="input"><option value="all">Todas as áreas</option>{AREAS.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select><select value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)} className="input"><option value="all">Prioridades</option>{priorityOptions.map((p) => <option key={p}>{p}</option>)}</select><select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="input"><option value="all">Todos os status</option>{statusOptions.map((s) => <option key={s}>{s}</option>)}</select></div><div className="mt-4 flex flex-wrap gap-2">{([['all','Todas'],['today','Hoje'],['upcoming','Próximas'],['late','Atrasadas'],['done','Concluídas']] as const).map(([key,label]) => <button key={key} onClick={() => setPeriodFilter(key)} className={`rounded-full px-3 py-1.5 text-sm font-semibold ${periodFilter === key ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-600"}`}>{label}</button>)}</div></Card>
-            <div className="space-y-3">{loading ? <Card><div className="py-10 text-center text-sm font-semibold text-slate-500">Carregando suas missões...</div></Card> : filteredTasks.length === 0 ? <Card><div className="py-10 text-center"><ListTodo className="mx-auto mb-3 size-9 text-slate-300" /><h3 className="font-bold">Nenhuma tarefa encontrada</h3><p className="mt-1 text-sm text-slate-500">Crie uma nova missão ou ajuste os filtros.</p></div></Card> : filteredTasks.map((task) => <TaskCard key={task.id} task={task} projectLabel={projectName(task.projectId)} tagLabels={task.tagIds.map(tagName).filter(Boolean)} onEdit={() => editTask(task)} onComplete={() => void run(() => completeTaskDb(task.id), "Missão concluída!")} onReopen={() => void run(() => reopenTaskDb(task.id), "Missão reaberta.")} onDelete={() => { if (window.confirm("Excluir esta tarefa?")) void run(() => deleteTaskDb(task.id), "Missão excluída."); }} onToggleSubtask={(s) => void toggleSubtask(task.id, s)} />)}</div>
+            <div className="space-y-3">{loading ? <Card><div className="py-10 text-center text-sm font-semibold text-slate-500">Carregando suas missões...</div></Card> : filteredTasks.length === 0 ? <Card><div className="py-10 text-center"><ListTodo className="mx-auto mb-3 size-9 text-slate-300" /><h3 className="font-bold">Nenhuma tarefa encontrada</h3><p className="mt-1 text-sm text-slate-500">Crie uma nova missão ou ajuste os filtros.</p></div></Card> : filteredTasks.map((task) => <TaskCard key={task.id} task={task} projectLabel={projectName(task.projectId)} tagLabels={task.tagIds.map(tagName).filter(Boolean)} onEdit={() => editTask(task)} onComplete={() => completeTask(task)} onReopen={() => void run(() => reopenTaskDb(task.id), "Missão reaberta.")} onDelete={() => { if (window.confirm("Excluir esta tarefa?")) void run(() => deleteTaskDb(task.id), "Missão excluída."); }} onToggleSubtask={(s) => void toggleSubtask(task.id, s)} />)}</div>
           </section>
         )}
           </div>
         </div>
       </div>
+      <RewardToast burst={burst} onDone={clearBurst} />
     </main>
   );
 }
@@ -260,11 +317,35 @@ function TaskCard({ task, projectLabel, tagLabels, onEdit, onComplete, onReopen,
   const today = new Date(); today.setHours(0,0,0,0);
   const due = task.dueDate ? new Date(`${task.dueDate}T00:00:00`) : null;
   const late = due && due < today && !done;
-  return <div className={`rounded-2xl border bg-white p-4 shadow-sm transition ${done ? "border-emerald-200 bg-emerald-50/40" : late ? "border-red-200" : "border-slate-200"}`}><div className="flex flex-col gap-4 sm:flex-row sm:items-start"><button onClick={done ? onReopen : onComplete} className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-full border-2 ${done ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300 text-transparent hover:border-emerald-500 hover:text-emerald-500"}`}><Check className="size-4" /></button><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className={`font-bold ${done ? "text-slate-400 line-through" : "text-slate-900"}`}>{task.title}</h3><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${area.soft} ${area.text}`}>{area.name}</span>{projectLabel && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{projectLabel}</span>}</div>{task.description && <p className="mt-1 line-clamp-2 text-sm text-slate-500">{task.description}</p>}<div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs font-semibold text-slate-500">{task.dueDate && <span className={late ? "text-red-600" : ""}><CalendarDays className="mr-1 inline size-3.5" />{late ? "Atrasada · " : ""}{new Date(`${task.dueDate}T00:00:00`).toLocaleDateString("pt-BR")}</span>}<span><Clock3 className="mr-1 inline size-3.5" />{task.duration || 0} min</span><span><Zap className="mr-1 inline size-3.5" />{task.xp || calcXp(task.difficulty, task.priority)} XP</span><span>{task.priority}</span>{tagLabels.map((tag) => <span key={tag}>#{tag}</span>)}</div>{task.subtasks.length > 0 && <><button onClick={() => setOpen((v) => !v)} className="mt-3 text-xs font-bold text-violet-600">{open ? "Ocultar" : "Ver"} subtarefas ({task.subtasks.filter((s) => s.isCompleted).length}/{task.subtasks.length})</button>{open && <div className="mt-2 space-y-2">{task.subtasks.map((s) => <label key={s.id} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium"><input type="checkbox" checked={s.isCompleted} onChange={() => onToggleSubtask(s)} /><span className={s.isCompleted ? "text-slate-400 line-through" : ""}>{s.title}</span></label>)}</div>}</>}</div><div className="flex gap-1 self-end sm:self-start"><IconButton label="Editar" onClick={onEdit}><Edit3 className="size-4" /></IconButton><IconButton label={done ? "Reabrir" : "Concluir"} onClick={done ? onReopen : onComplete}><CircleCheck className="size-4" /></IconButton><IconButton label="Excluir" onClick={onDelete} danger><Trash2 className="size-4" /></IconButton></div></div></div>;
+  return <div className={`rounded-2xl border bg-white p-4 shadow-sm transition ${done ? "border-emerald-200 bg-emerald-50/40" : late ? "border-red-200" : "border-slate-200"}`}><div className="flex flex-col gap-4 sm:flex-row sm:items-start"><button onClick={done ? onReopen : onComplete} className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-full border-2 ${done ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300 text-transparent hover:border-emerald-500 hover:text-emerald-500"}`}><Check className="size-4" /></button><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className={`font-bold ${done ? "text-slate-400 line-through" : "text-slate-900"}`}>{task.title}</h3><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${area.soft} ${area.text}`}>{area.name}</span>{projectLabel && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{projectLabel}</span>}</div>{task.description && <p className="mt-1 line-clamp-2 text-sm text-slate-500">{task.description}</p>}<div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs font-semibold text-slate-500">{task.dueDate && <span className={late ? "text-red-600" : ""}><CalendarDays className="mr-1 inline size-3.5" />{late ? "Atrasada · " : ""}{new Date(`${task.dueDate}T00:00:00`).toLocaleDateString("pt-BR")}</span>}<span><Clock3 className="mr-1 inline size-3.5" />{task.duration || 0} min</span><span><Zap className="mr-1 inline size-3.5" />{done ? task.xp + task.xpBonus : task.xp || calcXp(task.difficulty, task.priority)} XP{done && task.xpBonus > 0 && <span className="ml-1 text-orange-600">(combo +{task.xpBonus})</span>}</span><span>{task.priority}</span>{tagLabels.map((tag) => <span key={tag}>#{tag}</span>)}</div>{task.subtasks.length > 0 && <><button onClick={() => setOpen((v) => !v)} className="mt-3 text-xs font-bold text-violet-600">{open ? "Ocultar" : "Ver"} subtarefas ({task.subtasks.filter((s) => s.isCompleted).length}/{task.subtasks.length})</button>{open && <div className="mt-2 space-y-2">{task.subtasks.map((s) => <label key={s.id} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium"><input type="checkbox" checked={s.isCompleted} onChange={() => onToggleSubtask(s)} /><span className={s.isCompleted ? "text-slate-400 line-through" : ""}>{s.title}</span></label>)}</div>}</>}</div><div className="flex gap-1 self-end sm:self-start"><IconButton label="Editar" onClick={onEdit}><Edit3 className="size-4" /></IconButton><IconButton label={done ? "Reabrir" : "Concluir"} onClick={done ? onReopen : onComplete}><CircleCheck className="size-4" /></IconButton><IconButton label="Excluir" onClick={onDelete} danger><Trash2 className="size-4" /></IconButton></div></div></div>;
+}
+
+function SomedayDrawer({ tasks, projectName, saving, onBringBack, onEdit }: { tasks: Task[]; projectName: (id: string) => string; saving: boolean; onBringBack: (task: Task) => void; onEdit: (task: Task) => void }) {
+  const [query, setQuery] = useState("");
+  const [area, setArea] = useState("all");
+  const visible = tasks.filter((task) => (area === "all" || task.area === area) && `${task.title} ${task.description} ${projectName(task.projectId)}`.toLowerCase().includes(query.toLowerCase()));
+  return (
+    <section className="space-y-5">
+      <div><p className="text-sm font-bold text-violet-600">ALGUM DIA</p><h2 className="text-3xl font-bold tracking-tight">A gaveta sem culpa</h2><p className="mt-1 text-sm text-slate-500">Missões guardadas não aparecem em Hoje, no Calendário nem nas atrasadas. Puxe de volta só o que ainda importa: ela volta com prazo para hoje.</p></div>
+      <Card><div className="grid gap-3 sm:grid-cols-[1fr_200px]"><div className="relative"><Search className="absolute left-3 top-3 size-4 text-slate-400" /><input value={query} onChange={(e) => setQuery(e.target.value)} className="input pl-10" placeholder="Buscar na gaveta..." /></div><select value={area} onChange={(e) => setArea(e.target.value)} className="input"><option value="all">Todas as áreas</option>{AREAS.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></div></Card>
+      {visible.length === 0 ? (
+        <Card><div className="py-10 text-center"><Archive className="mx-auto mb-3 size-9 text-slate-300" /><h3 className="font-bold">{tasks.length ? "Nada encontrado com esse filtro" : "Gaveta vazia"}</h3><p className="mt-1 text-sm text-slate-500">{tasks.length ? "Ajuste a busca ou a área." : "Quando acumular atrasadas, guarde-as aqui com um clique."}</p></div></Card>
+      ) : (
+        <div className="space-y-2">{visible.map((task) => {
+          const a = AREAS.find((x) => x.id === task.area) ?? AREAS[0]!;
+          return (
+            <div key={task.id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center">
+              <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="font-bold text-slate-900">{task.title}</h3><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${a.soft} ${a.text}`}>{a.name}</span>{projectName(task.projectId) && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{projectName(task.projectId)}</span>}</div><p className="mt-1 text-xs font-semibold text-slate-400">{task.dueDate ? `Prazo original: ${new Date(`${task.dueDate}T00:00:00`).toLocaleDateString("pt-BR")}` : "Sem prazo"} · {task.xp} XP</p></div>
+              <div className="flex gap-2 self-end sm:self-center"><IconButton label="Editar" onClick={() => onEdit(task)}><Edit3 className="size-4" /></IconButton><button onClick={() => onBringBack(task)} disabled={saving} className="flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-60"><ArchiveRestore className="size-4" /> Trazer para hoje</button></div>
+            </div>
+          );
+        })}</div>
+      )}
+    </section>
+  );
 }
 
 function Card({ children }: { children: ReactNode }) { return <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">{children}</div>; }
-function Pill({ children }: { children: ReactNode }) { return <div className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700">{children}</div>; }
 function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) { return <label className="block"><span className="mb-2 block text-sm font-bold text-slate-700">{label}{required && <span className="text-red-500"> *</span>}</span>{children}</label>; }
 function SectionTitle({ title, subtitle }: { title: string; subtitle: string }) { return <div className="mb-5"><h3 className="text-lg font-bold">{title}</h3><p className="mt-1 text-sm text-slate-500">{subtitle}</p></div>; }
 function Select({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) { return <select value={value} onChange={(e) => onChange(e.target.value)} className="input">{options.map((o) => <option key={o}>{o}</option>)}</select>; }

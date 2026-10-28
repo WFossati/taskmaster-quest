@@ -16,7 +16,6 @@ import { Route as InvestmentsRouteImport } from './routes/investments'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as RewardsRouteImport } from './routes/rewards'
-import { Route as StudyHubRouteImport } from './routes/study-hub'
 import { Route as UfrgsRouteImport } from './routes/ufrgs'
 import { Route as WeeklyReviewRouteImport } from './routes/weekly-review'
 
@@ -55,11 +54,6 @@ const RewardsRoute = RewardsRouteImport.update({
   path: '/rewards',
   getParentRoute: () => rootRouteImport,
 } as any)
-const StudyHubRoute = StudyHubRouteImport.update({
-  id: '/study-hub',
-  path: '/study-hub',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const UfrgsRoute = UfrgsRouteImport.update({
   id: '/ufrgs',
   path: '/ufrgs',
@@ -79,7 +73,6 @@ export interface FileRoutesByFullPath {
   '/library': typeof LibraryRoute
   '/profile': typeof ProfileRoute
   '/rewards': typeof RewardsRoute
-  '/study-hub': typeof StudyHubRoute
   '/ufrgs': typeof UfrgsRoute
   '/weekly-review': typeof WeeklyReviewRoute
 }
@@ -91,7 +84,6 @@ export interface FileRoutesByTo {
   '/library': typeof LibraryRoute
   '/profile': typeof ProfileRoute
   '/rewards': typeof RewardsRoute
-  '/study-hub': typeof StudyHubRoute
   '/ufrgs': typeof UfrgsRoute
   '/weekly-review': typeof WeeklyReviewRoute
 }
@@ -104,7 +96,6 @@ export interface FileRoutesById {
   '/library': typeof LibraryRoute
   '/profile': typeof ProfileRoute
   '/rewards': typeof RewardsRoute
-  '/study-hub': typeof StudyHubRoute
   '/ufrgs': typeof UfrgsRoute
   '/weekly-review': typeof WeeklyReviewRoute
 }
@@ -118,7 +109,6 @@ export interface FileRouteTypes {
     | '/library'
     | '/profile'
     | '/rewards'
-    | '/study-hub'
     | '/ufrgs'
     | '/weekly-review'
   fileRoutesByTo: FileRoutesByTo
@@ -130,7 +120,6 @@ export interface FileRouteTypes {
     | '/library'
     | '/profile'
     | '/rewards'
-    | '/study-hub'
     | '/ufrgs'
     | '/weekly-review'
   id:
@@ -142,7 +131,6 @@ export interface FileRouteTypes {
     | '/library'
     | '/profile'
     | '/rewards'
-    | '/study-hub'
     | '/ufrgs'
     | '/weekly-review'
   fileRoutesById: FileRoutesById
@@ -155,7 +143,6 @@ export interface RootRouteChildren {
   LibraryRoute: typeof LibraryRoute
   ProfileRoute: typeof ProfileRoute
   RewardsRoute: typeof RewardsRoute
-  StudyHubRoute: typeof StudyHubRoute
   UfrgsRoute: typeof UfrgsRoute
   WeeklyReviewRoute: typeof WeeklyReviewRoute
 }
@@ -211,13 +198,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RewardsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/study-hub': {
-      id: '/study-hub'
-      path: '/study-hub'
-      fullPath: '/study-hub'
-      preLoaderRoute: typeof StudyHubRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/ufrgs': {
       id: '/ufrgs'
       path: '/ufrgs'
@@ -243,7 +223,6 @@ const rootRouteChildren: RootRouteChildren = {
   LibraryRoute: LibraryRoute,
   ProfileRoute: ProfileRoute,
   RewardsRoute: RewardsRoute,
-  StudyHubRoute: StudyHubRoute,
   UfrgsRoute: UfrgsRoute,
   WeeklyReviewRoute: WeeklyReviewRoute,
 }

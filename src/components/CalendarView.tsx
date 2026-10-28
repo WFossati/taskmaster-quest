@@ -98,6 +98,7 @@ function formatPeriodTitle(anchor: Date, view: ViewMode) {
 }
 
 function taskXp(task: Task) {
+  if (task.status === "Concluída") return task.xp + task.xpBonus;
   return task.xp || calcXp(task.difficulty, task.priority);
 }
 

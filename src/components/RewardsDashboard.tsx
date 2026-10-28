@@ -1,6 +1,7 @@
 import { Coins, Gift, Plus, ShoppingBag, Sparkles, Trash2, Trophy, Zap } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
+import { XP_PER_COIN } from "@/lib/gamification";
 import {
   convertXpToCoins,
   createReward,
@@ -42,8 +43,8 @@ export function RewardsDashboard({ userId }: { userId: string }) {
 
   useEffect(() => { void reload(); }, [reload, userId]);
 
-  const xpNeeded = coinsToConvert * 1000;
-  const maxConvertibleCoins = Math.floor(summary.availableXp / 1000);
+  const xpNeeded = coinsToConvert * XP_PER_COIN;
+  const maxConvertibleCoins = Math.floor(summary.availableXp / XP_PER_COIN);
   const canConvert = coinsToConvert > 0 && xpNeeded <= summary.availableXp;
   const nextReward = useMemo(() => [...rewards].filter((reward) => reward.coinCost > summary.coinBalance).sort((a, b) => a.coinCost - b.coinCost)[0] ?? null, [rewards, summary.coinBalance]);
 
@@ -78,7 +79,7 @@ export function RewardsDashboard({ userId }: { userId: string }) {
     <section className="space-y-6">
       <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div><p className="text-sm font-bold uppercase tracking-[0.18em] text-violet-600">Recompensas</p><h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Sua loja pessoal</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">Transforme o XP das missões concluídas em moedas e use suas moedas para comprar recompensas reais.</p></div>
-        <div className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-bold text-violet-700">1.000 XP = 1 moeda</div>
+        <div className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-bold text-violet-700">{XP_PER_COIN} XP = 1 moeda</div>
       </div>
 
       {error && <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">{error}</div>}

@@ -18,27 +18,36 @@ export type Task = {
   recurrence: string;
   status: string;
   xp: number;
+  /** Bônus de combo ganho na conclusão (0 quando aberta). */
+  xpBonus: number;
   subtasks: Subtask[];
   tagIds: string[];
   createdAt: string;
   completedAt?: string;
-  study?: { subjectId: string };
+  /** Preenchido quando a missão está guardada na gaveta "Algum dia". */
+  somedayAt?: string;
 };
 
-export type TaskInput = Omit<Task, "id" | "createdAt" | "completedAt">;
+export type TaskInput = Omit<Task, "id" | "createdAt" | "completedAt" | "somedayAt" | "xpBonus">;
 
+export type CompletionResult = { baseXp: number; bonusXp: number; multiplier: number; combo: number };
+
+/** Missões do antigo Study Hub (agora um sistema separado). Ficam no banco, mas não aparecem aqui. */
 const STUDY_PREFIX = "[STUDY_HUB_V1]";
 
-function decodeDescription(value: string | null): { description: string; study?: { subjectId: string } } {
-  if (!value?.startsWith(STUDY_PREFIX)) return { description: value ?? "" };
-  try {
-    const parsed: unknown = JSON.parse(value.slice(STUDY_PREFIX.length));
-    if (parsed && typeof parsed === "object" && "subjectId" in parsed && "description" in parsed &&
-      typeof parsed.subjectId === "string" && typeof parsed.description === "string") {
-      return { description: parsed.description, study: { subjectId: parsed.subjectId } };
-    }
-  } catch { /* Keep legacy or malformed descriptions visible. */ }
-  return { description: value };
+function isStudyHubTask(description: string | null) {
+  return Boolean(description?.startsWith(STUDY_PREFIX));
+}
+
+function localISODate(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function userTimeZone() {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo"; } catch { return "America/Sao_Paulo"; }
 }
 
 export function calcXp(difficulty: string, priority: string) {
@@ -80,10 +89,10 @@ export async function fetchTasks(): Promise<Task[]> {
       .order("created_at", { ascending: false }),
   );
 
-  return tasks.map((t) => ({
+  return tasks.filter((t) => !isStudyHubTask(t.description)).map((t) => ({
     id: t.id,
     title: t.title,
-    ...decodeDescription(t.description),
+    description: t.description ?? "",
     area: t.area,
     projectId: t.project_id ?? "",
     priority: t.priority,
@@ -94,8 +103,10 @@ export async function fetchTasks(): Promise<Task[]> {
     recurrence: t.recurrence,
     status: t.status,
     xp: t.xp_reward,
+    xpBonus: t.xp_bonus ?? 0,
     createdAt: t.created_at,
     ...(t.completed_at ? { completedAt: t.completed_at } : {}),
+    ...(t.someday_at ? { somedayAt: t.someday_at } : {}),
     subtasks: [...(t.subtasks ?? [])]
       .sort((a, b) => a.created_at.localeCompare(b.created_at))
       .map((s) => ({ id: s.id, title: s.title, isCompleted: s.is_completed })),
@@ -114,13 +125,6 @@ export async function deleteProject(projectId: string) {
   unwrap(await supabase.from("projects").delete().eq("id", projectId).select("id").single());
 }
 
-export async function setStudyTaskXp(userId: string, tasks: Task[]) {
-  const ids = tasks.filter((task) => task.study && task.xp !== 20).map((task) => task.id);
-  if (!ids.length) return;
-  const updated = unwrap(await supabase.from("tasks").update({ xp_reward: 20 }).eq("user_id", userId).in("id", ids).select("id"));
-  if (updated.length !== ids.length) throw new Error("Não foi possível padronizar o XP de todas as tarefas de estudo.");
-}
-
 export async function createTag(userId: string, name: string): Promise<TagRow> {
   const row = unwrap(
     await supabase.from("tags").insert({ user_id: userId, name }).select("id, name").single(),
@@ -132,7 +136,7 @@ function taskColumns(userId: string, input: TaskInput) {
   return {
     user_id: userId,
     title: input.title,
-    description: input.study ? `${STUDY_PREFIX}${JSON.stringify({ subjectId: input.study.subjectId, description: input.description })}` : input.description || null,
+    description: input.description || null,
     area: input.area,
     project_id: input.projectId || null,
     priority: input.priority,
@@ -142,7 +146,7 @@ function taskColumns(userId: string, input: TaskInput) {
     difficulty: input.difficulty,
     recurrence: input.recurrence,
     status: input.status,
-    xp_reward: input.study ? 20 : input.xp,
+    xp_reward: input.xp,
   };
 }
 
@@ -175,44 +179,93 @@ async function syncTags(userId: string, taskId: string, tagIds: string[]) {
   );
 }
 
+/**
+ * Cria a missão. Se ela já nasce "Concluída", a conclusão passa pelo complete_task
+ * (data de conclusão + combo), igual ao botão de concluir.
+ */
 export async function createTask(userId: string, input: TaskInput): Promise<string> {
+  const completing = input.status === "Concluída";
   const row = unwrap(
-    await supabase.from("tasks").insert(taskColumns(userId, input)).select("id").single(),
+    await supabase
+      .from("tasks")
+      .insert({ ...taskColumns(userId, input), ...(completing ? { status: "Inbox" } : {}) })
+      .select("id")
+      .single(),
   );
   await syncSubtasks(userId, row.id, input.subtasks);
   await syncTags(userId, row.id, input.tagIds);
+  if (completing) await completeTask(row.id);
   return row.id;
 }
 
-export async function updateTask(userId: string, taskId: string, input: TaskInput) {
+/**
+ * Atualiza a missão. Mudar o status para/de "Concluída" pelo formulário agora mantém
+ * completed_at e o bônus de combo coerentes.
+ */
+export async function updateTask(userId: string, taskId: string, input: TaskInput): Promise<CompletionResult | null> {
+  const current = unwrap(
+    await supabase.from("tasks").select("status").eq("id", taskId).single(),
+  );
+  const wasDone = current.status === "Concluída";
+  const willBeDone = input.status === "Concluída";
+  const columns = taskColumns(userId, input);
   unwrap(
     await supabase
       .from("tasks")
-      .update(taskColumns(userId, input))
+      .update({
+        ...columns,
+        ...(willBeDone && !wasDone ? { status: current.status } : {}),
+        ...(!willBeDone && wasDone ? { completed_at: null, xp_bonus: 0 } : {}),
+      })
       .eq("id", taskId)
       .select("id")
       .single(),
   );
   await syncSubtasks(userId, taskId, input.subtasks);
   await syncTags(userId, taskId, input.tagIds);
+  return willBeDone && !wasDone ? completeTask(taskId) : null;
 }
 
-export async function completeTask(taskId: string) {
-  unwrap(
-    await supabase
-      .from("tasks")
-      .update({ status: "Concluída", completed_at: new Date().toISOString() })
-      .eq("id", taskId)
-      .select("id")
-      .single(),
-  );
+/** Conclui com combo do dia: 2ª missão 1,2×, 3ª em diante 1,5×. */
+export async function completeTask(taskId: string): Promise<CompletionResult> {
+  const rows = unwrap(await supabase.rpc("complete_task", { p_task_id: taskId, p_tz: userTimeZone() }));
+  const row = rows[0];
+  if (!row) throw new Error("Não foi possível concluir a missão.");
+  return { baseXp: row.base_xp, bonusXp: row.bonus_xp, multiplier: Number(row.multiplier), combo: row.combo };
 }
 
 export async function reopenTask(taskId: string) {
   unwrap(
     await supabase
       .from("tasks")
-      .update({ status: "Em andamento", completed_at: null })
+      .update({ status: "Em andamento", completed_at: null, xp_bonus: 0 })
+      .eq("id", taskId)
+      .select("id")
+      .single(),
+  );
+}
+
+/** Guarda as missões indicadas na gaveta "Algum dia". Não apaga nada: prazo, status e XP ficam como estavam. */
+export async function moveTasksToSomeday(taskIds: string[]): Promise<number> {
+  if (!taskIds.length) return 0;
+  const rows = unwrap(
+    await supabase
+      .from("tasks")
+      .update({ someday_at: new Date().toISOString() })
+      .in("id", taskIds)
+      .neq("status", "Concluída")
+      .is("someday_at", null)
+      .select("id"),
+  );
+  return rows.length;
+}
+
+/** Tira a missão da gaveta e coloca o prazo para hoje. */
+export async function bringBackFromSomeday(taskId: string) {
+  unwrap(
+    await supabase
+      .from("tasks")
+      .update({ someday_at: null, due_date: localISODate() })
       .eq("id", taskId)
       .select("id")
       .single(),

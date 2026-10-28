@@ -465,11 +465,13 @@ export type Database = {
           priority: string
           project_id: string | null
           recurrence: string
+          someday_at: string | null
           status: string
           title: string
           updated_at: string
           user_id: string
           xp_reward: number
+          xp_bonus: number
         }
         Insert: {
           area: string
@@ -484,11 +486,13 @@ export type Database = {
           priority?: string
           project_id?: string | null
           recurrence?: string
+          someday_at?: string | null
           status?: string
           title: string
           updated_at?: string
           user_id: string
           xp_reward?: number
+          xp_bonus?: number
         }
         Update: {
           area?: string
@@ -503,11 +507,13 @@ export type Database = {
           priority?: string
           project_id?: string | null
           recurrence?: string
+          someday_at?: string | null
           status?: string
           title?: string
           updated_at?: string
           user_id?: string
           xp_reward?: number
+          xp_bonus?: number
         }
         Relationships: [
           {
@@ -572,6 +578,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      complete_task: {
+        Args: { p_task_id: string; p_tz?: string }
+        Returns: {
+          base_xp: number
+          bonus_xp: number
+          combo: number
+          multiplier: number
+        }[]
+      }
       convert_xp_to_coins: {
         Args: { p_coins: number }
         Returns: {
